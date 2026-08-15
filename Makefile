@@ -94,9 +94,20 @@ test-desktop:
 	@desktop-file-validate pop-settings/data/pop-settings.desktop
 
 # Seam 2: Pop Settings application test suite.
+#
+# The tests build real GTK4/Libadwaita widgets, and GTK4 segfaults when it
+# constructs a widget with no display at all. In a graphical session that is
+# free; on a headless runner the suite goes through Xvfb.
 test-python:
 	@echo "Running pop-settings test suite..."
-	@cd pop-settings && uv run pytest -q
+	@if [ -n "$$DISPLAY" ] || [ -n "$$WAYLAND_DISPLAY" ]; then \
+		cd pop-settings && uv run pytest -q; \
+	elif command -v xvfb-run >/dev/null; then \
+		cd pop-settings && xvfb-run -a uv run pytest -q; \
+	else \
+		echo "error: the widget tests need a display; install xvfb or run inside a graphical session"; \
+		exit 1; \
+	fi
 
 # ---------------------------------------------------------------------------
 # Install

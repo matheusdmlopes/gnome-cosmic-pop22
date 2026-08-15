@@ -21,6 +21,7 @@ makedepends=(
     'rust'
     'glib2'
     'desktop-file-utils'
+    'xorg-server-xvfb'
     'python'
     'uv'
 )

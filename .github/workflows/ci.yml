@@ -26,6 +26,7 @@ jobs:
             gir1.2-adw-1 \
             libgirepository1.0-dev \
             desktop-file-utils \
+            xvfb \
             build-essential
 
       - name: Setup Node.js
