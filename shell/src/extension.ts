@@ -268,7 +268,11 @@ export class Ext extends Ecs.System<ExtEvent> {
         this.dbus.FocusDown = () => this.focus_down();
         this.dbus.FocusLeft = () => this.focus_left();
         this.dbus.FocusRight = () => this.focus_right();
-        this.dbus.Launcher = () => this.window_search.open(this);
+        // The interface declares no return value, so the open result is
+        // deliberately dropped here.
+        this.dbus.Launcher = () => {
+            this.window_search.open(this);
+        };
 
         this.dbus.WindowFocus = (window: [number, number]) => {
             const target_window = this.windows.get(window);

@@ -48,24 +48,30 @@ export function overview_show(kind) {
         if (applications.visible()) {
             applications.hide();
         }
-        let launched = false;
-        // The Pop Launcher lives in a separate service process. If it is not
-        // installed, or its D-Bus service fails to answer, fall back to the
-        // applications drawer rather than leaving the Super key doing nothing.
+        // The Pop Launcher lives in a separate service process, and pop-shell
+        // itself may be missing or disabled. open() reports back what it did,
+        // so the drawer only takes over when the launcher genuinely cannot
+        // show up. A spawn failure never raises: it is reported as
+        // 'unavailable', which is precisely the case a thrown exception used
+        // to miss. 'suppressed' means pop-shell chose not to open (already
+        // open, or a fullscreen window has focus), and that choice stands.
+        let outcome;
         try {
-            with_pop_shell((ext) => {
+            outcome = with_pop_shell((ext) => {
                 if (!ext.window_search)
-                    return;
+                    return 'unavailable';
                 ext.tiler?.exit?.(ext);
                 ext.window_search.load_desktop_files?.();
-                ext.window_search.open(ext);
-                launched = true;
+                // A pop-shell older than this one returns nothing; assume it
+                // opened, which is what this extension always assumed.
+                return ext.window_search.open(ext) ?? 'opened';
             });
         } catch (e) {
             console.error(`pop-cosmic: Pop Launcher unavailable, falling back to the applications drawer: ${e}`);
-            launched = false;
+            outcome = 'unavailable';
         }
-        if (!launched) {
+        // undefined means pop-shell is not loaded at all.
+        if ((outcome ?? 'unavailable') === 'unavailable') {
             applications.show();
         }
     } else {

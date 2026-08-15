@@ -26,6 +26,19 @@ interface SearchOption {
     menu: St.Widget;
 }
 
+/** Outcome of an attempt to show the launcher.
+ *
+ * - `opened`: the dialog is on screen with a service behind it.
+ * - `suppressed`: deliberately not shown. The launcher is already open, or a
+ *   fullscreen window has focus and the user has not opted into overriding it.
+ * - `unavailable`: the launcher cannot be shown at all, because the modal
+ *   refused to open or the `pop-launcher` service could not be started.
+ *
+ * Callers that have something else to show, such as pop-cosmic's applications
+ * drawer, must only fall back on `unavailable`.
+ */
+export type OpenResult = 'opened' | 'suppressed' | 'unavailable';
+
 export class Launcher extends search.Search {
     ext: Ext;
     options: Map<number, SearchOption> = new Map();
@@ -305,14 +318,14 @@ export class Launcher extends search.Search {
         return null;
     }
 
-    open(ext: Ext) {
+    open(ext: Ext): OpenResult {
         ext.tiler.exit(ext);
 
         // Do not allow opening twice
-        if (this.opened) return;
+        if (this.opened) return 'suppressed';
 
         // Do not activate if the focused window is fullscreen
-        if (!ext.settings.fullscreen_launcher() && ext.focus_window()?.meta.is_fullscreen()) return;
+        if (!ext.settings.fullscreen_launcher() && ext.focus_window()?.meta.is_fullscreen()) return 'suppressed';
 
         this.opened = true;
 
@@ -324,28 +337,63 @@ export class Launcher extends search.Search {
         super._open(global.get_current_time(), false);
 
         if (!this.dialog.visible) {
-            this.clear();
-            this.cancel();
-            this.close();
-            return;
+            this.dismiss();
+            return 'unavailable';
         }
 
         super.cleanup();
-        this.start_services();
+
+        // Without the service there is nothing behind the entry: every query
+        // would go nowhere and the dialog would just sit there empty. Take it
+        // back down and let the caller show something useful instead.
+        if (!this.start_services()) {
+            this.dismiss();
+            return 'unavailable';
+        }
+
         this.search('');
 
         this.dialog.dialogLayout.x = mon_width / 2 - this.dialog.dialogLayout.width / 2;
 
         let height = mon_work_area.height >= 900 ? mon_work_area.height / 2 : mon_work_area.height / 3.5;
         this.dialog.dialogLayout.y = height - this.dialog.dialogLayout.height / 2;
+
+        return 'opened';
     }
 
-    start_services() {
+    /** Tears the dialog back down after it turned out it cannot be used. */
+    private dismiss() {
+        this.clear();
+        this.cancel();
+        this.close();
+    }
+
+    /** The service process went away on its own, so the dialog on screen is a
+     * dead end. Drop it rather than leaving the user typing into nothing. */
+    private on_service_lost() {
+        log.error('pop-launcher service exited unexpectedly');
+        this.service = null;
+        if (this.opened) this.dismiss();
+    }
+
+    /** @returns whether a service is available to answer queries. */
+    start_services(): boolean {
         if (this.service === null) {
             log.debug('starting pop-launcher service');
             const ipc = utils.async_process_ipc(['pop-launcher']);
-            this.service = ipc ? new service.LauncherService(ipc, (resp) => this.on_response(resp)) : null;
+            if (!ipc) {
+                log.error('pop-launcher service is unavailable');
+                return false;
+            }
+
+            this.service = new service.LauncherService(
+                ipc,
+                (resp) => this.on_response(resp),
+                () => this.on_service_lost(),
+            );
         }
+
+        return true;
     }
 
     stop_services(_ext: Ext) {

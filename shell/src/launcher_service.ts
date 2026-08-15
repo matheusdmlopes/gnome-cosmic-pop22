@@ -13,7 +13,10 @@ const { byteArray } = imports;
 export class LauncherService {
     service: utils.AsyncIPC;
 
-    constructor(service: utils.AsyncIPC, callback: (response: JsonIPC.Response) => void) {
+    /** @param on_lost Called when the service goes away on its own: end of
+     * stream, or a read error that is not our own cancellation. It is never
+     * called for an `exit()` we asked for, since that cancels the read first. */
+    constructor(service: utils.AsyncIPC, callback: (response: JsonIPC.Response) => void, on_lost: () => void = () => {}) {
         this.service = service;
 
         /** Recursively registers an intent to read the next line asynchronously  */
@@ -25,6 +28,10 @@ export class LauncherService {
                     // log.debug(`received response from launcher service: ${string}`)
                     callback(JSON.parse(string));
                     this.service.stdout.read_line_async(0, this.service.cancellable, generator);
+                } else {
+                    // End of stream: the process closed stdout, so no further
+                    // request will ever be answered.
+                    on_lost();
                 }
             } catch (why) {
                 // Do not print an error if it was merely cancelled.
@@ -33,6 +40,7 @@ export class LauncherService {
                 }
 
                 log.error(`failed to read response from launcher service: ${why}`);
+                on_lost();
             }
         };
 
