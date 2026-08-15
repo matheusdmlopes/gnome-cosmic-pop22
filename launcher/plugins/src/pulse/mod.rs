@@ -142,14 +142,14 @@ fn pactl_sinks() -> flume::Receiver<String> {
             .stdout(std::process::Stdio::piped())
             .spawn();
 
-        if let Ok(mut child) = child {
-            if let Some(stdout) = child.stdout.take() {
-                use tokio::io::AsyncBufReadExt;
-                let mut lines = tokio::io::BufReader::new(stdout).lines();
-                while let Ok(Some(line)) = lines.next_line().await {
-                    if let Some(stripped) = line.strip_prefix("Sink #") {
-                        let _ = tx.send_async(stripped.trim().to_owned()).await;
-                    }
+        let stdout = child.ok().and_then(|mut child| child.stdout.take());
+
+        if let Some(stdout) = stdout {
+            use tokio::io::AsyncBufReadExt;
+            let mut lines = tokio::io::BufReader::new(stdout).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                if let Some(stripped) = line.strip_prefix("Sink #") {
+                    let _ = tx.send_async(stripped.trim().to_owned()).await;
                 }
             }
         }

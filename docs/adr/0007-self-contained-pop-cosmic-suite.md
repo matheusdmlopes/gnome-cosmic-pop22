@@ -21,6 +21,9 @@ Accepted. Supersedes [0002](0002-upstream-pop-shell-and-forked-extensions.md), w
 
 ## Consequences
 
-- Full offline reproducibility and independence from upstream breaking changes.
+- A self-contained installed runtime that does not depend on external GNOME
+  extensions. During the public beta, source builds may fetch dependencies
+  pinned by their lockfiles; fully offline source builds are deferred until a
+  stable release requires them.
 - Seamless single-command installation (`make install` or Debian `.deb` package).
 - Consistent and clean multi-language ready codebase.

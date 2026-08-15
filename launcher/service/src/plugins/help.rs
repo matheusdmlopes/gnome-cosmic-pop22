@@ -51,16 +51,18 @@ impl HelpPlugin {
 #[async_trait::async_trait]
 impl Plugin for HelpPlugin {
     async fn activate(&mut self, id: u32) {
-        if let Some(detail) = self.details.get(id as usize) {
-            if let Some(help) = detail.help.as_ref() {
-                let _ = self
-                    .tx
-                    .send_async(Event::Response((
-                        self.id,
-                        PluginResponse::Fill(help.clone()),
-                    )))
-                    .await;
-            }
+        if let Some(help) = self
+            .details
+            .get(id as usize)
+            .and_then(|detail| detail.help.as_ref())
+        {
+            let _ = self
+                .tx
+                .send_async(Event::Response((
+                    self.id,
+                    PluginResponse::Fill(help.clone()),
+                )))
+                .await;
         }
     }
 

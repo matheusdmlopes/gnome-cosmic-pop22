@@ -3,12 +3,13 @@
 pkgname=gnome-cosmic-pop22
 pkgver=0.1.0
 pkgrel=1
-pkgdesc="Pop COSMIC desktop experience for GNOME Shell 48+ - extensions, settings app, themes, icons, and wallpapers"
-arch=('any')
+pkgdesc="Unofficial Pop COSMIC suite for GNOME Shell 48"
+arch=('x86_64')
 url="https://github.com/matheusdmlopes/gnome-cosmic-pop22"
-license=('GPL-3.0-or-later')
+license=('GPL-3.0-only' 'MPL-2.0' 'LGPL-2.1-only' 'LGPL-3.0-or-later' 'CC-BY-SA-4.0')
 depends=(
-    'gnome-shell>=45'
+    'gnome-shell>=48'
+    'gnome-shell<49'
     'python>=3.10'
     'python-gobject'
     'libadwaita'
@@ -20,6 +21,9 @@ makedepends=(
     'typescript'
     'rust'
     'glib2'
+    'libxkbcommon'
+    'meson'
+    'sassc'
     'desktop-file-utils'
     'xorg-server-xvfb'
     'python'

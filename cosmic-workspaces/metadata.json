@@ -3,9 +3,6 @@
     "description": "Bringing back vertically stacked workspaces",
     "original-author": "rens.althuis@gmail.com",
     "shell-version": [
-        "45",
-        "46",
-        "47",
         "48"
     ],
     "url": "",

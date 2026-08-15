@@ -1,0 +1,46 @@
+[advisories]
+yanked = "deny"
+
+[licenses]
+confidence-threshold = 0.93
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "ISC",
+    "MIT",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+]
+
+[[licenses.clarify]]
+name = "cosmic-client-toolkit"
+expression = "GPL-3.0-or-later"
+license-files = [{ path = "../src/LICENSE", hash = 0xc5a651aa }]
+
+[[licenses.clarify]]
+name = "switcheroo-control"
+expression = "MPL-2.0"
+license-files = [{ path = "../LICENSE.md", hash = 0x0d4a6b51 }]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = [
+    "https://github.com/pop-os//cosmic-protocols",
+    "https://github.com/pop-os/dbus-settings-bindings",
+]

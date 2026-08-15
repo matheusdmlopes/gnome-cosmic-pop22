@@ -203,10 +203,8 @@ async fn qcalc(regex: &mut Regex, expression: &str, decimal_comma: bool) -> Opti
 
             let cut = if let Some(pos) = normalized.rfind('≈') {
                 pos
-            } else if let Some(pos) = normalized.rfind('=') {
-                pos + 1
             } else {
-                return None;
+                normalized.rfind('=')? + 1
             };
 
             normalized = normalized[cut..].trim_start();
@@ -229,10 +227,11 @@ pub async fn uses_decimal_comma() -> bool {
         .output()
         .await;
 
-    if let Ok(output) = spawn_result {
-        if let Ok(string) = String::from_utf8(output.stdout) {
-            return string.contains("decimal_point=\",\"");
-        }
+    if let Some(string) = spawn_result
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+    {
+        return string.contains("decimal_point=\",\"");
     }
 
     false

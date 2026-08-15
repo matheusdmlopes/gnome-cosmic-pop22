@@ -1,11 +1,11 @@
 # Pop COSMIC Suite
 
-Modernized, self-contained Pop!_OS desktop experience suite for GNOME Shell 48+, featuring refactored extensions, visual themes, and a standalone settings application built with Libadwaita.
+Modernized, self-contained Pop!_OS desktop experience suite for GNOME Shell 48, featuring refactored extensions, visual themes, and a standalone settings application built with Libadwaita.
 
 ## Language
 
 **Pop COSMIC Suite**:
-The integrated, self-contained collection of GNOME Shell extensions, visual themes, and the Pop Settings app designed to deliver the complete Pop!_OS workflow on GNOME 48 without external extension dependencies.
+The integrated, self-contained collection of GNOME Shell extensions, Pop Launcher, visual themes, and the Pop Settings app designed to deliver the complete Pop!_OS workflow on GNOME 48 without external extension dependencies. Wallpapers are optional companion assets rather than part of the core suite.
 _Avoid_: COSMIC Desktop, Rust COSMIC, Pure Pop OS
 
 **Pop Settings**:
@@ -23,6 +23,10 @@ _Avoid_: gnome-workspaces, workspace-matrix
 **pop-shell**:
 Integrated tiling window manager extension embedded directly into the suite to provide automatic window snapping, tiling grids, and window management shortcuts.
 _Avoid_: external tiling dependency, uncoordinated tiling
+
+**Pop Launcher**:
+Search service and plugin collection used by pop-shell to find and launch applications, files, commands, and other desktop results.
+_Avoid_: application drawer, GNOME overview search
 
 **Extension Status Banner**:
 Reusable Libadwaita UI component that listens to D-Bus lifecycle status events from GNOME Shell extensions and displays contextual status banners in preferences pages.

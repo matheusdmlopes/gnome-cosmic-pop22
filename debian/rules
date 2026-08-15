@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+# SPDX-License-Identifier: GPL-3.0-only
+
+export DH_VERBOSE = 1
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	$(MAKE) build-shell build-launcher
+
+override_dh_auto_install:
+	$(MAKE) install PREFIX=/usr DESTDIR=$(CURDIR)/debian/gnome-cosmic-pop22
+
+override_dh_auto_test:
+	$(MAKE) test-schemas test-syntax test-launcher test-desktop test-release-contract
+
+override_dh_auto_clean:
+	$(MAKE) clean
+	dh_auto_clean

@@ -19,7 +19,7 @@ pub struct IpcClient {
 impl IpcClient {
     pub fn new_with_args(args: Args) -> io::Result<(Self, impl Stream<Item = Response>)> {
         let mut child = process::Command::new("pop-launcher")
-            .args(&[
+            .args([
                 "--max-open",
                 args.max_open.to_string().as_str(),
                 "--max-files",
@@ -34,12 +34,12 @@ impl IpcClient {
         let stdin = child
             .stdin
             .take()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "failed to find child stdin"))?;
+            .ok_or_else(|| io::Error::other("failed to find child stdin"))?;
 
         let stdout = child
             .stdout
             .take()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "failed to find child stdout"))?;
+            .ok_or_else(|| io::Error::other("failed to find child stdout"))?;
 
         let responses = LinesStream::new(tokio::io::BufReader::new(stdout).lines()).filter_map(
             |result| async move {

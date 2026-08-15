@@ -31,7 +31,7 @@ pub enum ToplevelAction {
 }
 
 pub enum ToplevelUpdate {
-    Info(ToplevelInfo),
+    Info(Box<ToplevelInfo>),
     Remove(ExtForeignToplevelHandleV1),
 }
 
@@ -144,7 +144,7 @@ impl ToplevelInfoHandler for AppData {
             .pending_update
             .drain()
             .map(|handle| match self.toplevel_info_state.info(&handle) {
-                Some(info) => ToplevelUpdate::Info(info.clone()),
+                Some(info) => ToplevelUpdate::Info(Box::new(info.clone())),
                 None => ToplevelUpdate::Remove(handle),
             })
             .collect();

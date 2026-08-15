@@ -67,67 +67,69 @@ impl ExternalPlugin {
             .ok();
 
         if let Some(mut child) = child {
-            if let Some(stdout) = child.stdout.take() {
-                let detached = self.detached.clone();
-                let searching = self.searching.clone();
-                let (trip_tx, trip_rx) = oneshot::<()>();
-                let tx = self.tx.clone();
-                let name = self.name().to_owned();
-                let id = self.id;
+            let Some(stdout) = child.stdout.take() else {
+                return self.process.as_mut();
+            };
 
-                // Spawn a background task to forward JSON responses from the child process.
-                let task = tokio::spawn(async move {
-                    let tx_ = tx.clone();
-                    let searching_ = searching.clone();
-                    let name_ = name.clone();
+            let detached = self.detached.clone();
+            let searching = self.searching.clone();
+            let (trip_tx, trip_rx) = oneshot::<()>();
+            let tx = self.tx.clone();
+            let name = self.name().to_owned();
+            let id = self.id;
 
-                    // Future for directly handling the JSON output from the process.
-                    let responder = async move {
-                        let mut requests = crate::json_input_stream(stdout);
+            // Spawn a background task to forward JSON responses from the child process.
+            let task = tokio::spawn(async move {
+                let tx_ = tx.clone();
+                let searching_ = searching.clone();
+                let name_ = name.clone();
 
-                        while let Some(result) = requests.next().await {
-                            match result {
-                                Ok(response) => {
-                                    if let PluginResponse::Finished = response {
-                                        searching_.store(false, Ordering::SeqCst);
-                                    }
+                // Future for directly handling the JSON output from the process.
+                let responder = async move {
+                    let mut requests = crate::json_input_stream(stdout);
 
-                                    let _ = tx_.send_async(Event::Response((id, response))).await;
+                    while let Some(result) = requests.next().await {
+                        match result {
+                            Ok(response) => {
+                                if let PluginResponse::Finished = response {
+                                    searching_.store(false, Ordering::SeqCst);
                                 }
-                                Err(why) => {
-                                    tracing::error!("{}: serde error: {:?}", name_, why);
-                                }
+
+                                let _ = tx_.send_async(Event::Response((id, response))).await;
+                            }
+                            Err(why) => {
+                                tracing::error!("{}: serde error: {:?}", name_, why);
                             }
                         }
-
-                        tracing::debug!("{}: exiting from responder", name_);
-                    };
-
-                    let trip = async move {
-                        let _ = trip_rx.await;
-                    };
-
-                    futures::pin_mut!(responder);
-                    futures::pin_mut!(trip);
-
-                    futures::future::select(responder, trip)
-                        .await
-                        .factor_first();
-
-                    // Ensure that a task that was searching sends a finished signal if it dies.
-                    if searching.swap(false, Ordering::SeqCst) {
-                        let _ = tx
-                            .send_async(Event::Response((id, PluginResponse::Finished)))
-                            .await;
                     }
 
-                    detached.store(true, Ordering::SeqCst);
+                    tracing::debug!("{}: exiting from responder", name_);
+                };
 
-                    event!(Level::DEBUG, "{}: detached plugin", name);
-                });
+                let trip = async move {
+                    let _ = trip_rx.await;
+                };
 
-                self.process = Some((task, child, trip_tx));
-            }
+                futures::pin_mut!(responder);
+                futures::pin_mut!(trip);
+
+                futures::future::select(responder, trip)
+                    .await
+                    .factor_first();
+
+                // Ensure that a task that was searching sends a finished signal if it dies.
+                if searching.swap(false, Ordering::SeqCst) {
+                    let _ = tx
+                        .send_async(Event::Response((id, PluginResponse::Finished)))
+                        .await;
+                }
+
+                detached.store(true, Ordering::SeqCst);
+
+                event!(Level::DEBUG, "{}: detached plugin", name);
+            });
+
+            self.process = Some((task, child, trip_tx));
         }
 
         self.process.as_mut()
@@ -156,16 +158,19 @@ impl ExternalPlugin {
             self.launch();
         }
 
-        if let Some((_, child, _)) = self.process.as_mut() {
-            if let Some(stdin) = child.stdin.as_mut() {
-                if let Ok(mut serialized) = serde_json::to_vec(event) {
-                    serialized.push(b'\n');
-                    stdin.write_all(&serialized).await?;
-                    tracing::debug!("{}: sent message to external process", self.name());
-                }
+        let stdin = self
+            .process
+            .as_mut()
+            .and_then(|(_, child, _)| child.stdin.as_mut());
 
-                return Ok(());
+        if let Some(stdin) = stdin {
+            if let Ok(mut serialized) = serde_json::to_vec(event) {
+                serialized.push(b'\n');
+                stdin.write_all(&serialized).await?;
+                tracing::debug!("{}: sent message to external process", self.name());
             }
+
+            return Ok(());
         }
 
         Err(io::Error::new(

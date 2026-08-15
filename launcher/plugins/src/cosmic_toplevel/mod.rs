@@ -78,12 +78,12 @@ pub async fn main() {
                             {
                                 if info.state.contains(&State::Activated) {
                                     app.toplevels.remove(pos);
-                                    app.toplevels.push(Box::new(info));
+                                    app.toplevels.push(*info);
                                 } else {
-                                    app.toplevels[pos] = Box::new(info);
+                                    app.toplevels[pos] = *info;
                                 }
                             } else {
-                                app.toplevels.push(Box::new(info));
+                                app.toplevels.push(*info);
                             }
                         }
                         ToplevelUpdate::Remove(foreign_toplevel) => {
@@ -111,7 +111,7 @@ struct App<W> {
     locales: Vec<String>,
     desktop_entries: Vec<DesktopEntry>,
     ids_to_ignore: Vec<u32>,
-    toplevels: Vec<Box<ToplevelInfo>>,
+    toplevels: Vec<ToplevelInfo>,
     calloop_tx: calloop::channel::Sender<ToplevelAction>,
     tx: W,
 }
@@ -218,6 +218,6 @@ impl<W: AsyncWrite + Unpin> App<W> {
         }
 
         send(&mut self.tx, PluginResponse::Finished).await;
-        let _ = self.tx.flush();
+        let _ = self.tx.flush().await;
     }
 }

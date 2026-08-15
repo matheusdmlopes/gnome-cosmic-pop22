@@ -59,10 +59,8 @@ fn init_logging(cmd: &str) {
         .open(logdir.join([cmd, ".log"].concat().as_str()).as_path());
 
     if let Ok(file) = logfile {
-        if let Ok(meta) = file.metadata() {
-            if meta.len() > 1000 {
-                let _ = file.set_len(0);
-            }
+        if file.metadata().is_ok_and(|meta| meta.len() > 1000) {
+            let _ = file.set_len(0);
         }
 
         let fmt_layer = tracing_subscriber::fmt::layer()

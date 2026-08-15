@@ -4,6 +4,7 @@ version = "1.2.4"
 license = "GPL-3.0-only"
 authors = ["Michael Aaron Murphy <mmstick@pm.me>"]
 edition.workspace = true
+rust-version.workspace = true
 publish = false
 
 [dependencies]
@@ -29,8 +30,8 @@ anyhow.workspace = true
 flume.workspace = true
 dirs.workspace = true
 futures.workspace = true
-bytes = "1.10.1"
-recently-used-xbel = "1.1.0"
+bytes = "1.11.1"
+quick-xml = { version = "0.41.0", features = ["serialize"] }
 
 # dependencies cosmic toplevel
 cctk = { git = "https://github.com/pop-os/cosmic-protocols", package = "cosmic-client-toolkit" }

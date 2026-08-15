@@ -103,34 +103,42 @@ impl<W: AsyncWrite + Unpin> App<W> {
                 // Avoid showing the GNOME Shell entry entirely
                 if de
                     .name(&[] as &[&str])
-                    .map_or(false, |v| EXCLUSIONS.contains(&v.as_ref()))
+                    .is_some_and(|v| EXCLUSIONS.contains(&v.as_ref()))
                 {
                     return None;
                 }
 
                 // Do not show if our desktop is defined in `NotShowIn`.
-                if let Some(not_show_in) = de.not_show_in() {
-                    if let Some(current_desktop) = &self.current_desktop {
-                        if not_show_in.iter().any(|not_show| {
+                let hidden_on_current_desktop = de
+                    .not_show_in()
+                    .zip(self.current_desktop.as_ref())
+                    .is_some_and(|(not_show_in, current_desktop)| {
+                        not_show_in.iter().any(|not_show| {
                             current_desktop
                                 .iter()
                                 .any(|desktop| &not_show.to_ascii_lowercase() == desktop)
-                        }) {
-                            return None;
-                        }
-                    }
+                        })
+                    });
+
+                if hidden_on_current_desktop {
+                    return None;
                 }
 
                 // Do not show if our desktop is not defined in `OnlyShowIn`.
                 if let Some(only_show_in) = de.only_show_in() {
-                    if let Some(current_desktop) = &self.current_desktop {
-                        if !only_show_in.iter().any(|show_in| {
-                            current_desktop
-                                .iter()
-                                .any(|desktop| &show_in.to_ascii_lowercase() == desktop)
-                        }) {
-                            return None;
-                        }
+                    let hidden_on_current_desktop =
+                        self.current_desktop
+                            .as_ref()
+                            .is_some_and(|current_desktop| {
+                                !only_show_in.iter().any(|show_in| {
+                                    current_desktop
+                                        .iter()
+                                        .any(|desktop| &show_in.to_ascii_lowercase() == desktop)
+                                })
+                            });
+
+                    if hidden_on_current_desktop {
+                        return None;
                     }
                 }
                 // Treat `OnlyShowIn` as an override otherwise do not show if `NoDisplay` is true
@@ -248,8 +256,8 @@ impl<W: AsyncWrite + Unpin> App<W> {
                 let append = search_interest.starts_with(&*query)
                     || query
                         .split_ascii_whitespace()
-                        .any(|query| search_interest.contains(&*query))
-                    || strsim::jaro_winkler(&*query, &*search_interest) > 0.6;
+                        .any(|query| search_interest.contains(query))
+                    || strsim::jaro_winkler(&query, &search_interest) > 0.6;
 
                 if append {
                     let response = PluginResponse::Append(PluginSearchResult {
@@ -275,7 +283,7 @@ impl<W: AsyncWrite + Unpin> App<W> {
         }
 
         send(&mut self.tx, PluginResponse::Finished).await;
-        let _ = self.tx.flush();
+        let _ = self.tx.flush().await;
     }
 
     async fn gnome_context(&self, entry: &DesktopEntry) -> Vec<ContextOption> {

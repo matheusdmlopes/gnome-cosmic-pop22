@@ -1,0 +1,78 @@
+name: Publish public beta
+
+on:
+  workflow_dispatch:
+    inputs:
+      manual_acceptance:
+        description: "Confirm the X11 and Wayland release checklist is signed off"
+        required: true
+        type: boolean
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    if: inputs.manual_acceptance
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    environment: beta-release
+
+    steps:
+      - name: Require the beta tag
+        run: test "$GITHUB_REF" = refs/tags/v0.1.0-beta.1
+
+      - name: Install runner prerequisites
+        run: |
+          apt-get update
+          apt-get install -y ca-certificates curl git jq
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+
+      - name: Require successful CI for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          response="$(curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=completed&per_page=100")"
+          jq -e --arg sha "$GITHUB_SHA" \
+            'any(.workflow_runs[]; .head_sha == $sha and .conclusion == "success")' \
+            <<<"$response" >/dev/null
+
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y \
+            build-essential cargo debhelper desktop-file-utils gjs \
+            gir1.2-adw-1 gir1.2-gtk-4.0 libgirepository1.0-dev libglib2.0-dev \
+            libxkbcommon-dev jq meson node-typescript python3 python3-gi \
+            python3-gi-cairo rustc sassc
+
+      - name: Build release assets
+        run: |
+          dpkg-buildpackage --no-sign --build=binary
+          package="$(find .. -maxdepth 1 -name 'gnome-cosmic-pop22_*_amd64.deb' -print -quit)"
+          test -n "$package"
+          package_dir="$(dirname "$package")"
+          package_name="$(basename "$package")"
+          (cd "$package_dir" && sha256sum "$package_name" > "${package_name}.sha256")
+          cargo metadata --manifest-path launcher/Cargo.toml --locked --format-version 1 \
+            | jq '{dependencies: [.packages[] | {name, version, license, source}] | sort_by(.name, .version)}' \
+            > rust-dependencies.json
+
+      - name: Publish GitHub prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0-beta.1
+          name: Pop COSMIC Suite 0.1.0 beta 1
+          prerelease: true
+          generate_release_notes: true
+          files: |
+            ../gnome-cosmic-pop22_*_amd64.deb
+            ../gnome-cosmic-pop22_*_amd64.deb.sha256
+            rust-dependencies.json

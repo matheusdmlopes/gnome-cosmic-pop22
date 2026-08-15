@@ -2,7 +2,9 @@
 name = "pop-launcher-toolkit"
 version = "1.2.7"
 description = "A wrapper around pop-launcher, pop-launcher-service and pop-launcher-plugins types for writing plugins and frontends for pop-launcher."
+license = "MPL-2.0"
 edition.workspace = true
+rust-version.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

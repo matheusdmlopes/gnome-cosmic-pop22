@@ -1,6 +1,6 @@
 # Spec: Sinalização Confiável de Falha do Pop Launcher
 
-**Status:** ready-for-agent
+**Status:** implemented
 
 ## Problem Statement
 

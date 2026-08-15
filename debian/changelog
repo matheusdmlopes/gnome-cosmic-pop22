@@ -1,0 +1,7 @@
+gnome-cosmic-pop22 (0.1.0~beta1-1) unstable; urgency=medium
+
+  * Public beta for Debian 13, GNOME Shell 48, and amd64.
+  * Bundle pop-cosmic, cosmic-workspaces, pop-shell, Pop Launcher, Pop
+    Settings, and the Pop GTK and icon themes.
+
+ -- De Marco Tech <contato@demarcotech.com.br>  Fri, 15 Aug 2026 12:00:00 -0300

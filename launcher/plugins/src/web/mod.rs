@@ -84,33 +84,39 @@ impl App {
 
     pub async fn search(&mut self, query: String) {
         self.queries.clear();
-        if let Some(word) = query.split_ascii_whitespace().next() {
-            if let Some(defs) = self.config.get(word) {
-                for (id, def) in defs.iter().enumerate() {
-                    let (_, mut query) = query.split_at(word.len());
-                    query = query.trim();
-                    let encoded = build_query(def, query);
-                    let icon = self.get_favicon(def).await;
+        if let Some((word, defs)) = definitions_for_query(&self.config, &query) {
+            for (id, def) in defs.iter().enumerate() {
+                let (_, mut query) = query.split_at(word.len());
+                query = query.trim();
+                let encoded = build_query(def, query);
+                let icon = self.get_favicon(def).await;
 
-                    crate::send(
-                        &mut self.out,
-                        PluginResponse::Append(PluginSearchResult {
-                            id: id as u32,
-                            name: [&def.name, ": ", query].concat(),
-                            description: encoded.clone(),
-                            icon,
-                            ..Default::default()
-                        }),
-                    )
-                    .await;
+                crate::send(
+                    &mut self.out,
+                    PluginResponse::Append(PluginSearchResult {
+                        id: id as u32,
+                        name: [&def.name, ": ", query].concat(),
+                        description: encoded.clone(),
+                        icon,
+                        ..Default::default()
+                    }),
+                )
+                .await;
 
-                    self.queries.push(encoded);
-                }
+                self.queries.push(encoded);
             }
         }
 
         crate::send(&mut self.out, PluginResponse::Finished).await;
     }
+}
+
+fn definitions_for_query<'a>(
+    config: &'a Config,
+    query: &'a str,
+) -> Option<(&'a str, &'a [Definition])> {
+    let word = query.split_ascii_whitespace().next()?;
+    config.get(word).map(|definitions| (word, definitions))
 }
 
 impl App {
@@ -300,73 +306,61 @@ fn parse_favicon(html: &str) -> Option<String> {
 
 #[cfg(test)]
 mod test {
-    use crate::web::parse_favicon;
+    use crate::web::config::{RawConfig, Rule};
+    use crate::web::{Config, Definition, definitions_for_query, parse_favicon};
 
-    async fn fetch(url: &str) -> String {
-        reqwest::get(url).await.unwrap().text().await.unwrap()
+    #[test]
+    fn unknown_or_empty_prefix_has_no_definitions() {
+        let mut config = Config::default();
+        config.append(RawConfig {
+            rules: vec![Rule {
+                matches: vec!["known".to_string()],
+                queries: vec![Definition {
+                    name: "Known".to_string(),
+                    query: "example.com/?q=".to_string(),
+                    icon: String::new(),
+                }],
+            }],
+        });
+
+        assert!(definitions_for_query(&config, "unknown query").is_none());
+        assert!(definitions_for_query(&config, "").is_none());
+        assert!(definitions_for_query(&config, "known query").is_some());
     }
 
-    #[tokio::test]
-    async fn should_parse_favicon_url_github() {
-        let html = fetch("https://github.com").await;
-
-        let icon_url = parse_favicon(&html);
+    #[test]
+    fn should_parse_favicon_url_github() {
+        let icon_url = parse_favicon(include_str!("fixtures/github.html"));
         assert_eq!(
             Some("https://github.githubassets.com/favicons/favicon.png".to_string()),
             icon_url
         );
     }
 
-    #[tokio::test]
-    async fn should_parse_favicon_url_ddg() {
-        // Ddg returns a relative path to its favicon
-        let html = fetch("https://duckduckgo.com").await;
-
-        let icon_url = parse_favicon(&html);
+    #[test]
+    fn should_parse_relative_favicon_url() {
+        let icon_url = parse_favicon(include_str!("fixtures/relative.html"));
         assert_eq!(Some("/favicon.ico".to_string()), icon_url);
     }
 
-    #[tokio::test]
-    async fn parse_favicon_url_google_returns_none() {
-        // Google seems to set its favicon via javascript
-        // hence there is no way to get the favicon from the page
-        // source
-        let html = fetch("https://google.com").await;
-
-        let icon_url = parse_favicon(&html);
+    #[test]
+    fn page_without_favicon_returns_none() {
+        let icon_url = parse_favicon(include_str!("fixtures/no-favicon.html"));
         assert!(icon_url.is_none());
     }
 
-    #[tokio::test]
-    async fn should_parse_favicon_url_flathub() {
-        // Ensure we don't match the commented icon in flathub page
-        // <!-- <link rel="icon" type="image/x-icon" href="favicon.ico"> -->
-        // <link rel="icon" type="image/png" href="/assets/themes/flathub/favicon-32x32.png">
-        let html = fetch("https://flathub.org").await;
-
-        let icon_url = parse_favicon(&html);
+    #[test]
+    fn ignores_favicon_inside_html_comment() {
+        let icon_url = parse_favicon(include_str!("fixtures/commented-icon.html"));
         assert_eq!(
             Some("/assets/themes/flathub/favicon-32x32.png".to_string()),
             icon_url
         );
     }
 
-    #[tokio::test]
-    async fn should_parse_favicon_url_aliexpress() {
-        // Aliexpress icon href start with two slash :`href="//ae01.alicdn.com/images/eng/wholesale/icon/aliexpress.ico"`
-
-        let client = reqwest::Client::new();
-
-        let html = client
-            .get("https://aliexpress.com")
-            .send()
-            .await
-            .unwrap()
-            .text()
-            .await
-            .unwrap();
-
-        let icon_url = parse_favicon(&html);
+    #[test]
+    fn normalizes_scheme_relative_favicon_url() {
+        let icon_url = parse_favicon(include_str!("fixtures/scheme-relative.html"));
         assert_eq!(
             Some("https://ae01.alicdn.com/images/eng/wholesale/icon/aliexpress.ico".to_string()),
             icon_url

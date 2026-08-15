@@ -178,6 +178,7 @@ struct ScriptInfo {
 
 async fn load_from(path: &Path, paths: &mut VecDeque<PathBuf>, tx: Sender<ScriptInfo>) {
     if let Ok(directory) = path.read_dir() {
+        let shebang_re = Regex::new(r"^!\s*").unwrap();
         for entry in directory.filter_map(Result::ok) {
             let tx = tx.clone();
             let path = entry.path();
@@ -186,10 +187,8 @@ async fn load_from(path: &Path, paths: &mut VecDeque<PathBuf>, tx: Sender<Script
                 paths.push_back(path);
                 continue;
             }
-
+            let shebang_re = shebang_re.clone();
             tokio::spawn(async move {
-                let shebang_re = Regex::new(r"^!\s*").unwrap();
-
                 let mut file = match tokio::fs::File::open(&path).await {
                     Ok(file) => tokio::io::BufReader::new(file).lines(),
                     Err(why) => {

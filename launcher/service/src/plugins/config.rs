@@ -80,17 +80,12 @@ pub struct PluginQuery {
     pub regex: Option<Cow<'static, str>>,
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 pub enum PluginPriority {
     High = 0,
+    #[default]
     Default = 1,
     Low = 2,
-}
-
-impl Default for PluginPriority {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 pub fn load(source: &Path, config_path: &Path) -> Option<(PathBuf, PluginConfig, Option<Regex>)> {

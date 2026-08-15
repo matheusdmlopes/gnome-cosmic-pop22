@@ -3,11 +3,15 @@ name: CI
 on:
   push:
     branches: ["main"]
+    tags: ["v*"]
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  quality:
     runs-on: ubuntu-latest
 
     steps:
@@ -18,18 +22,29 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            desktop-file-utils \
             gjs \
+            gir1.2-adw-1 \
+            gir1.2-gtk-4.0 \
+            libgirepository1.0-dev \
             libglib2.0-dev \
+            meson \
             python3-gi \
             python3-gi-cairo \
-            gir1.2-gtk-4.0 \
-            gir1.2-adw-1 \
-            libgirepository1.0-dev \
-            desktop-file-utils \
-            xvfb \
-            build-essential
+            sassc \
+            xvfb
 
-      - name: Setup Node.js
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: launcher
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -38,19 +53,113 @@ jobs:
         run: npm install --global typescript
 
       - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Cache uv dependencies
-        uses: actions/cache@v4
+        uses: astral-sh/setup-uv@v6
         with:
-          path: |
-            ~/.cache/uv
-            pop-settings/.venv
-          key: uv-${{ runner.os }}-${{ hashFiles('pop-settings/uv.lock', 'pop-settings/pyproject.toml') }}
-          restore-keys: |
-            uv-${{ runner.os }}-
+          enable-cache: true
+          cache-dependency-glob: pop-settings/uv.lock
 
-      - name: Run tests
+      - name: Build launcher and themes
+        run: make build-release DESTDIR="${{ runner.temp }}/build-stage"
+
+      - name: Run full test suite
         run: make test
+
+      - name: Exercise staged install and uninstall
+        run: make test-install
+
+      - name: Generate Rust dependency inventory
+        working-directory: launcher
+        run: |
+          cargo metadata --locked --format-version 1 \
+            | jq '{dependencies: [.packages[] | {name, version, license, source}] | sort_by(.name, .version)}' \
+            > ../rust-dependencies.json
+
+      - name: Upload dependency inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-dependencies
+          path: rust-dependencies.json
+
+  supply-chain:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Audit Rust advisories and licenses
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: launcher/Cargo.toml
+          arguments: --workspace --all-features --locked --config launcher/deny.toml
+          command: check advisories licenses sources
+
+      - name: Scan repository for secrets
+        uses: gitleaks/gitleaks-action@v2
+
+  debian-package:
+    runs-on: ubuntu-latest
+    container: debian:trixie
+
+    steps:
+      - name: Install runner prerequisites
+        run: |
+          apt-get update
+          apt-get install -y ca-certificates git
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install package build dependencies
+        run: |
+          apt-get update
+          apt-get install -y \
+            build-essential \
+            cargo \
+            debhelper \
+            desktop-file-utils \
+            gjs \
+            gir1.2-adw-1 \
+            gir1.2-gtk-4.0 \
+            libgirepository1.0-dev \
+            libglib2.0-dev \
+            libxkbcommon-dev \
+            meson \
+            node-typescript \
+            python3 \
+            python3-gi \
+            python3-gi-cairo \
+            rustc \
+            sassc
+
+      - name: Build Debian package
+        run: dpkg-buildpackage --no-sign --build=binary
+
+      - name: Verify package contents
+        run: |
+          package="$(find .. -maxdepth 1 -name 'gnome-cosmic-pop22_*_amd64.deb' -print -quit)"
+          test -n "$package"
+          if dpkg-deb --contents "$package" \
+            | grep -Eq '\./usr/share/(backgrounds|gnome-background-properties)/|gschemas\.compiled$'; then
+            echo "Package contains wallpapers or a compiled schema cache" >&2
+            exit 1
+          fi
+          dpkg-deb --field "$package" Architecture | grep -qx amd64
+
+      - name: Exercise clean install and remove
+        run: |
+          package="$(find .. -maxdepth 1 -name 'gnome-cosmic-pop22_*_amd64.deb' -print -quit)"
+          apt-get install -y "$package"
+          mkdir -p /tmp/pop-cosmic-empty-home
+          XDG_DATA_HOME=/tmp/pop-cosmic-empty-home pop-cosmic-doctor
+          dpkg-query --show --showformat='${Status}\n' gnome-cosmic-pop22 | grep -qx 'install ok installed'
+          apt-get purge -y gnome-cosmic-pop22
+          test ! -e /usr/share/gnome-shell/extensions/pop-cosmic@system76.com
+
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: gnome-cosmic-pop22-debian13-amd64
+          path: ../gnome-cosmic-pop22_*_amd64.deb

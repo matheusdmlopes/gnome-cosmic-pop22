@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
+set -euo pipefail
+
+conflicts=0
+
+report_conflict() {
+    local path="$1"
+
+    if [[ -e "$path" ]]; then
+        conflicts=1
+        printf 'conflict: user-space path shadows the system package: %s\n' "$path"
+    fi
+}
+
+local_prefix="$HOME/.local"
+local_data="$local_prefix/share"
+xdg_data="${XDG_DATA_HOME:-$local_data}"
+
+data_roots=("$local_data")
+if [[ "$xdg_data" != "$local_data" ]]; then
+    data_roots+=("$xdg_data")
+fi
+
+for data_root in "${data_roots[@]}"; do
+    for relative_path in \
+        gnome-shell/extensions/pop-cosmic@system76.com \
+        gnome-shell/extensions/cosmic-workspaces@system76.com \
+        gnome-shell/extensions/pop-shell@system76.com \
+        glib-2.0/schemas/org.gnome.shell.extensions.pop-cosmic.gschema.xml \
+        glib-2.0/schemas/org.gnome.shell.extensions.cosmic-workspaces.gschema.xml \
+        glib-2.0/schemas/org.gnome.shell.extensions.pop-shell.gschema.xml \
+        applications/pop-settings.desktop \
+        applications/pop-cosmic-applications.desktop \
+        applications/pop-cosmic-launcher.desktop \
+        applications/pop-cosmic-workspaces.desktop \
+        pop-settings \
+        pop-launcher \
+        themes/Pop \
+        themes/Pop-dark \
+        gnome-shell/theme/Pop \
+        gnome-shell/theme/Pop-dark \
+        gnome-shell/theme/pop.css \
+        gnome-shell/theme/pop-dark.css \
+        icons/Pop \
+        icons/Pop-Dark \
+        icons/hicolor/scalable/actions/pop-cosmic-applications.svg \
+        icons/hicolor/scalable/actions/pop-cosmic-launcher.svg \
+        icons/hicolor/scalable/actions/pop-cosmic-workspaces.svg \
+        sounds/Pop
+    do
+        report_conflict "$data_root/$relative_path"
+    done
+done
+
+report_conflict "$local_prefix/bin/pop-launcher"
+report_conflict "$local_prefix/bin/pop-settings"
+report_conflict "$local_prefix/bin/pop-cosmic-doctor"
+
+if (( conflicts )); then
+    cat <<EOF
+
+The doctor did not change any files. Before using the system-wide beta,
+disable any listed extensions, move every listed path to a backup location,
+then log out and back in. Remove the backups only after verifying the package.
+EOF
+    exit 1
+fi
+
+echo "No conflicting user-space Pop COSMIC files found."

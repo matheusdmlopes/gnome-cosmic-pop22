@@ -6,6 +6,7 @@ authors = ["Michael Aaron Murphy <michael@mmurphy.dev>"]
 description = "Library for writing plugins and frontends for pop-launcher"
 repository = "https://github.com/pop-os/launcher"
 edition.workspace = true
+rust-version.workspace = true
 
 [workspace]
 members = ["bin", "plugins", "service", "toolkit"]
@@ -13,16 +14,17 @@ resolver = "3"
 
 [workspace.package]
 edition = "2024"
+rust-version = "1.85"
 
 [workspace.dependencies]
-anyhow = "1.0.100"
+anyhow = "1.0.104"
 serde = { version = "1.0.226", features = ["derive"] }
 serde_json = "1.0.145"
 tracing = "0.1.41"
 dirs = "6.0.0"
 serde_with = "3.14.1"
 futures = "0.3.31"
-flume = "0.11.1"
+flume = "0.12.0"
 toml = "0.9.7"
 regex = "1.11.2"
 ron = "0.11.0"

@@ -1,0 +1,114 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: gnome-cosmic-pop22
+Upstream-Contact: De Marco Tech <contato@demarcotech.com.br>
+Source: https://github.com/matheusdmlopes/gnome-cosmic-pop22
+Disclaimer: This is an unofficial project, unaffiliated with and not endorsed
+ by System76. Pop and COSMIC are used descriptively.
+
+Files: Makefile
+       .gitignore
+       AGENTS.md
+       README.md
+       .scratch/*
+       scripts/*
+       pop-settings/*
+       docs/*
+       CONTEXT.md
+       .github/*
+       debian/*
+       packaging/*
+Copyright: 2024-2026 De Marco Tech <contato@demarcotech.com.br>
+License: GPL-3.0-only
+
+Files: cosmic/*
+Copyright: 2021 System76, Inc.
+License: GPL-3.0-only
+
+Files: cosmic-workspaces/*
+Copyright: 2021 System76, Inc.
+           Rens Althuis <rens.althuis@gmail.com>
+License: GPL-3.0-only
+
+Files: shell/*
+Copyright: 2020-2024 System76, Inc.
+License: GPL-3.0-only
+
+Files: launcher/*
+Copyright: 2021-2024 System76, Inc.
+License: MPL-2.0
+
+Files: launcher/debian/*
+       launcher/bin/Cargo.toml
+       launcher/plugins/*
+       launcher/toolkit/examples/*
+Copyright: 2021-2024 System76, Inc.
+License: GPL-3.0-only
+
+Files: launcher/deny.toml
+Copyright: 2024-2026 De Marco Tech <contato@demarcotech.com.br>
+License: GPL-3.0-only
+
+Files: gtk-theme/*
+Copyright: 2019 System76, Inc.
+           2017-2018 Canonical Ltd.
+           2009-2015 Red Hat, Inc.
+           2009 Intel Corporation
+License: GPL-3.0-or-later
+
+Files: gtk-theme/gnome-shell/upstream/gnome-shell-sass/_common.scss
+Copyright: 2009-2015 Red Hat, Inc.
+           2009 Intel Corporation
+License: LGPL-2.1-only
+
+Files: gtk-theme/sounds/*
+Copyright: 2018 Mads Rosendahl <madsrh@gmail.com>
+License: CC-BY-SA-4.0
+
+Files: pop-icon-theme/*
+Copyright: 2016-2017 System76, Inc.
+License: LGPL-3.0-or-later or CC-BY-SA-4.0
+
+Files: wallpapers/*
+Copyright: 2017 System76, Inc.
+License: GPL-3.0-only
+
+Files: wallpapers/original/kate-hazen-*
+Copyright: Kate Hazen
+License: CC-BY-SA-4.0
+
+Files: wallpapers/original/nick-nazzaro-*
+Copyright: Nick Nazzaro
+License: CC-BY-SA-4.0
+
+Files: wallpapers/original/*.jpg
+       wallpapers/edit-sources/*
+Copyright: The photographers and editors named in wallpapers/README.md
+License: public-domain
+
+License: GPL-3.0-only
+ On Debian systems, the complete text of the GNU General Public License
+ version 3 is in /usr/share/common-licenses/GPL-3.
+
+License: GPL-3.0-or-later
+ On Debian systems, the complete text of the GNU General Public License
+ version 3 is in /usr/share/common-licenses/GPL-3.
+
+License: LGPL-2.1-only
+ The complete license text is installed at
+ /usr/share/doc/gnome-cosmic-pop22/licenses/LGPL-2.1.
+
+License: LGPL-3.0-or-later
+ The complete license text is installed at
+ /usr/share/doc/gnome-cosmic-pop22/licenses/LGPL-3.0.
+
+License: MPL-2.0
+ The complete Mozilla Public License 2.0 text is installed at
+ /usr/share/doc/gnome-cosmic-pop22/licenses/MPL-2.0.
+
+License: CC-BY-SA-4.0
+ The complete Creative Commons Attribution-ShareAlike 4.0 text is installed at
+ /usr/share/doc/gnome-cosmic-pop22/licenses/CC-BY-SA-4.0.
+
+License: public-domain
+ The bundled upstream wallpapers README identifies these photographs as
+ public-domain material and records the source URL and attribution for each.

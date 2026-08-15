@@ -19,6 +19,7 @@ SHELL_THEME_DIR := $(DESTDIR)$(PREFIX)/share/gnome-shell/theme
 BIN_DIR := $(DESTDIR)$(PREFIX)/bin
 SETTINGS_LIB_DIR := $(DESTDIR)$(PREFIX)/share/pop-settings
 SETTINGS_LIB_RUNTIME := $(PREFIX)/share/pop-settings
+DOC_DIR := $(DESTDIR)$(PREFIX)/share/doc/gnome-cosmic-pop22
 
 COSMIC_UUID := pop-cosmic@system76.com
 WORKSPACES_UUID := cosmic-workspaces@system76.com
@@ -36,9 +37,10 @@ LAUNCHER_SCRIPTS_DIR := $(LAUNCHER_LIB_DIR)/scripts
 LAUNCHER_BIN := $(BIN_DIR)/pop-launcher
 LAUNCHER_PLUGINS := calc desktop_entries files find pop_shell pulse recent scripts terminal web cosmic_toplevel
 
-.PHONY: all build build-shell build-launcher test test-syntax test-launcher test-schemas test-desktop test-python venv \
+.PHONY: all build build-release build-shell build-launcher test test-syntax test-launcher test-schemas test-desktop test-python \
+        test-rust test-format test-clippy test-release-contract test-doctor test-install venv \
         install install-cosmic install-workspaces install-shell install-settings install-launcher \
-        install-themes install-wallpapers install-all uninstall clean
+        install-themes install-wallpapers install-all uninstall uninstall-wallpapers uninstall-all clean
 
 all: build
 
@@ -46,11 +48,9 @@ all: build
 # Build
 # ---------------------------------------------------------------------------
 
-build:
-	@echo "Compiling GSettings schemas..."
-	@glib-compile-schemas --strict cosmic/schemas/
-	@glib-compile-schemas --strict cosmic-workspaces/schemas/
-	@glib-compile-schemas --strict shell/schemas/
+build: test-schemas
+
+build-release: build-shell build-launcher install-themes
 
 build-shell:
 	@if ! command -v tsc >/dev/null; then \
@@ -72,7 +72,7 @@ build-launcher:
 # Test - the three validation seams
 # ---------------------------------------------------------------------------
 
-test: test-schemas test-syntax test-launcher test-desktop test-python
+test: test-schemas test-syntax test-launcher test-desktop test-python test-rust test-format test-clippy test-release-contract test-doctor
 
 # Seam 1a: strict GSettings schema compilation.
 test-schemas:
@@ -126,41 +126,105 @@ test-python: venv
 		exit 1; \
 	fi
 
+test-rust:
+	@echo "Running deterministic Pop Launcher tests..."
+	@cd launcher && cargo test --workspace --locked
+
+test-format:
+	@echo "Checking Rust formatting..."
+	@cd launcher && cargo fmt --all -- --check
+
+test-clippy:
+	@echo "Running Clippy with warnings denied..."
+	@cd launcher && cargo clippy --workspace --all-targets --locked -- -D warnings
+
+test-release-contract:
+	@bash scripts/test-release-contract.sh
+
+test-doctor:
+	@bash scripts/test-doctor.sh
+
+# Exercises the public install/uninstall seam without touching the host.
+test-install:
+	@set -eu; \
+	stage="$$(mktemp -d)"; \
+	trap 'rm -rf "$$stage"' EXIT; \
+	$(MAKE) install PREFIX=/usr DESTDIR="$$stage"; \
+	test ! -e "$$stage/usr/share/glib-2.0/schemas/gschemas.compiled"; \
+	for uuid in $(COSMIC_UUID) $(WORKSPACES_UUID) $(SHELL_UUID); do \
+		test ! -d "$$stage/usr/share/gnome-shell/extensions/$$uuid/schemas"; \
+	done; \
+	$(MAKE) install-cosmic install-workspaces install-shell \
+		PREFIX=/opt/pop-user DESTDIR="$$stage"; \
+	for uuid in $(COSMIC_UUID) $(WORKSPACES_UUID) $(SHELL_UUID); do \
+		test -f "$$stage/opt/pop-user/share/gnome-shell/extensions/$$uuid/schemas/gschemas.compiled"; \
+	done; \
+	$(MAKE) uninstall PREFIX=/opt/pop-user DESTDIR="$$stage"; \
+	$(MAKE) uninstall PREFIX=/usr DESTDIR="$$stage"; \
+	if find "$$stage" -type f -o -type l | grep -q .; then \
+		echo "error: uninstall left suite-owned files in the staging root"; \
+		find "$$stage" -type f -o -type l; \
+		exit 1; \
+	fi
+
 # ---------------------------------------------------------------------------
 # Install
 # ---------------------------------------------------------------------------
 
 install: install-cosmic install-workspaces install-shell install-settings install-launcher install-themes
+	@install -d $(DOC_DIR)/licenses
+	@install -m 0644 launcher/LICENSE $(DOC_DIR)/licenses/MPL-2.0
+	@install -m 0644 pop-icon-theme/LICENSE $(DOC_DIR)/licenses/CC-BY-SA-4.0
+	@install -m 0644 gtk-theme/COPYING.LGPL-2.1 $(DOC_DIR)/licenses/LGPL-2.1
+	@install -m 0644 gtk-theme/COPYING.LGPL-3.0 $(DOC_DIR)/licenses/LGPL-3.0
 	@echo ""
 	@echo "Pop COSMIC Suite installed under $(PREFIX)."
 	@echo "Restart GNOME Shell (Alt+F2 -> r, or log out and back in on Wayland)."
 
 install-cosmic: build
 	@echo "Installing pop-cosmic extension..."
+	@rm -rf $(EXTENSIONS_DIR)/$(COSMIC_UUID)
 	@install -d $(EXTENSIONS_DIR)/$(COSMIC_UUID)
-	@cp -rf cosmic/*.js cosmic/*.css cosmic/metadata.json cosmic/schemas $(EXTENSIONS_DIR)/$(COSMIC_UUID)/
+	@cp -f cosmic/*.js cosmic/*.css cosmic/metadata.json $(EXTENSIONS_DIR)/$(COSMIC_UUID)/
+	@if [ "$(PREFIX)" != "/usr" ]; then \
+		install -d $(EXTENSIONS_DIR)/$(COSMIC_UUID)/schemas; \
+		install -m 0644 cosmic/schemas/*.gschema.xml $(EXTENSIONS_DIR)/$(COSMIC_UUID)/schemas/; \
+		glib-compile-schemas $(EXTENSIONS_DIR)/$(COSMIC_UUID)/schemas; \
+	fi
 	@install -d $(SCHEMAS_DIR)
 	@install -m 0644 cosmic/schemas/*.gschema.xml $(SCHEMAS_DIR)/
+	@if [ -z "$(DESTDIR)" ]; then glib-compile-schemas $(SCHEMAS_DIR); fi
 	@install -d $(APPLICATIONS_DIR) $(ICONS_DIR)
 	@cp -rf cosmic/usr/share/applications/. $(APPLICATIONS_DIR)/
 	@cp -rf cosmic/usr/share/icons/. $(ICONS_DIR)/
-	@glib-compile-schemas $(SCHEMAS_DIR)
 
 install-workspaces: build
 	@echo "Installing cosmic-workspaces extension..."
+	@rm -rf $(EXTENSIONS_DIR)/$(WORKSPACES_UUID)
 	@install -d $(EXTENSIONS_DIR)/$(WORKSPACES_UUID)
-	@cp -rf cosmic-workspaces/*.js cosmic-workspaces/*.css cosmic-workspaces/metadata.json cosmic-workspaces/schemas $(EXTENSIONS_DIR)/$(WORKSPACES_UUID)/
+	@cp -f cosmic-workspaces/*.js cosmic-workspaces/*.css cosmic-workspaces/metadata.json $(EXTENSIONS_DIR)/$(WORKSPACES_UUID)/
+	@if [ "$(PREFIX)" != "/usr" ]; then \
+		install -d $(EXTENSIONS_DIR)/$(WORKSPACES_UUID)/schemas; \
+		install -m 0644 cosmic-workspaces/schemas/*.gschema.xml $(EXTENSIONS_DIR)/$(WORKSPACES_UUID)/schemas/; \
+		glib-compile-schemas $(EXTENSIONS_DIR)/$(WORKSPACES_UUID)/schemas; \
+	fi
 	@install -d $(SCHEMAS_DIR)
 	@install -m 0644 cosmic-workspaces/schemas/*.gschema.xml $(SCHEMAS_DIR)/
-	@glib-compile-schemas $(SCHEMAS_DIR)
+	@if [ -z "$(DESTDIR)" ]; then glib-compile-schemas $(SCHEMAS_DIR); fi
 
 install-shell: build-shell
 	@echo "Installing pop-shell extension..."
+	@rm -rf $(EXTENSIONS_DIR)/$(SHELL_UUID)
 	@install -d $(EXTENSIONS_DIR)/$(SHELL_UUID)
 	@cp -rf shell/_build/. $(EXTENSIONS_DIR)/$(SHELL_UUID)/
+	@if [ "$(PREFIX)" = "/usr" ]; then \
+		rm -rf $(EXTENSIONS_DIR)/$(SHELL_UUID)/schemas; \
+	else \
+		glib-compile-schemas $(EXTENSIONS_DIR)/$(SHELL_UUID)/schemas; \
+	fi
 	@install -d $(SCHEMAS_DIR)
 	@install -m 0644 shell/schemas/*.gschema.xml $(SCHEMAS_DIR)/
-	@glib-compile-schemas $(SCHEMAS_DIR)
+	@if [ -z "$(DESTDIR)" ]; then glib-compile-schemas $(SCHEMAS_DIR); fi
 
 install-settings:
 	@echo "Installing Pop Settings application..."
@@ -172,6 +236,7 @@ install-settings:
 	@chmod 0755 $(BIN_DIR)/pop-settings
 	@install -d $(APPLICATIONS_DIR)
 	@install -m 0644 pop-settings/data/pop-settings.desktop $(APPLICATIONS_DIR)/
+	@install -m 0755 scripts/pop-cosmic-doctor $(BIN_DIR)/pop-cosmic-doctor
 
 install-launcher: build-launcher
 	@echo "Installing pop-launcher..."
@@ -204,9 +269,7 @@ install-themes:
 	@gtk-update-icon-cache -qtf $(ICONS_DIR)/Pop-Dark 2>/dev/null || true
 
 install-wallpapers:
-	@echo "Installing Pop wallpapers..."
-	@install -d $(BACKGROUNDS_DIR)
-	@cp -rf wallpapers/* $(BACKGROUNDS_DIR)/ 2>/dev/null || true
+	@$(MAKE) -C wallpapers install prefix=$(PREFIX) DESTDIR=$(DESTDIR)
 
 install-all: install install-wallpapers
 
@@ -225,6 +288,7 @@ uninstall:
 	@if [ -d $(SCHEMAS_DIR) ]; then glib-compile-schemas $(SCHEMAS_DIR); fi
 	@rm -rf $(SETTINGS_LIB_DIR)
 	@rm -f $(BIN_DIR)/pop-settings
+	@rm -f $(BIN_DIR)/pop-cosmic-doctor
 	@rm -f $(APPLICATIONS_DIR)/pop-settings.desktop
 	@rm -f $(APPLICATIONS_DIR)/pop-cosmic-applications.desktop
 	@rm -f $(APPLICATIONS_DIR)/pop-cosmic-launcher.desktop
@@ -239,7 +303,13 @@ uninstall:
 	@rm -rf $(SHELL_THEME_DIR)/Pop $(SHELL_THEME_DIR)/Pop-dark
 	@rm -f $(SHELL_THEME_DIR)/pop.css $(SHELL_THEME_DIR)/pop-dark.css
 	@rm -rf $(SOUNDS_DIR)/Pop
+	@rm -rf $(DOC_DIR)
 	@echo "Uninstall completed."
+
+uninstall-wallpapers:
+	@$(MAKE) -C wallpapers uninstall prefix=$(PREFIX) DESTDIR=$(DESTDIR)
+
+uninstall-all: uninstall uninstall-wallpapers
 
 clean:
 	@rm -f cosmic/schemas/gschemas.compiled

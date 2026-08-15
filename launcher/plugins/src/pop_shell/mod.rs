@@ -135,22 +135,20 @@ impl<W: AsyncWrite + Unpin> App<W> {
 
             if let Some(desktop_entry) = item.desktop_entry.strip_suffix(".desktop") {
                 for (_, path) in &self.desktop_entries {
-                    if let Some(name) = path.file_stem() {
-                        if desktop_entry == name {
-                            if let Ok(data) = fs::read_to_string(path) {
-                                if let Ok(entry) = fde::DesktopEntry::from_str(
-                                    path,
-                                    &data,
-                                    Some(&get_languages_from_env()),
-                                ) {
-                                    if let Some(icon) = entry.icon() {
-                                        icon_name = Cow::Owned(icon.to_owned());
-                                    }
-                                }
-                            }
-
-                            break;
+                    if path.file_stem().is_some_and(|name| desktop_entry == name) {
+                        if let Some(icon) = fs::read_to_string(path).ok().and_then(|data| {
+                            fde::DesktopEntry::from_str(
+                                path,
+                                &data,
+                                Some(&get_languages_from_env()),
+                            )
+                            .ok()
+                            .and_then(|entry| entry.icon().map(str::to_owned))
+                        }) {
+                            icon_name = Cow::Owned(icon);
                         }
+
+                        break;
                     }
                 }
             }

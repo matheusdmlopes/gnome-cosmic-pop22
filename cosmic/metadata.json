@@ -3,9 +3,6 @@
   "name": "Pop COSMIC",
   "original-authors": "System76",
   "shell-version": [
-    "45",
-    "46",
-    "47",
     "48"
   ],
   "url": "https://github.com/pop-os/cosmic",

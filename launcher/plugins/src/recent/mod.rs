@@ -1,11 +1,38 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright © 2021 System76
 
+use anyhow::Context;
 use futures::prelude::*;
 use pop_launcher::*;
-use recently_used_xbel::{RecentlyUsed, parse_file};
+use serde::Deserialize;
 use slab::Slab;
-use std::borrow::Cow;
+use std::{borrow::Cow, fs};
+
+#[derive(Debug, Deserialize)]
+struct RecentlyUsed {
+    #[serde(rename = "bookmark", default)]
+    bookmarks: Vec<Bookmark>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Bookmark {
+    #[serde(rename = "@href")]
+    href: String,
+}
+
+fn parse_file() -> anyhow::Result<RecentlyUsed> {
+    let path = dirs::home_dir()
+        .context("home directory is unavailable")?
+        .join(".local/share/recently-used.xbel");
+    let contents =
+        fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))?;
+
+    parse_recently_used(&contents).context("failed to deserialize recently-used.xbel")
+}
+
+fn parse_recently_used(contents: &str) -> Result<RecentlyUsed, quick_xml::DeError> {
+    quick_xml::de::from_str(contents)
+}
 
 pub struct App {
     recent: Option<RecentlyUsed>,
@@ -71,24 +98,26 @@ impl App {
 
                 let lowername = name.to_ascii_lowercase();
 
-                if query.split_whitespace().all(|key| lowername.contains(key)) {
-                    if let Some(mime) = new_mime_guess::from_path(&item.href).first() {
-                        let id = self.uris.insert(item.href.clone());
-                        crate::send(
-                            &mut self.out,
-                            PluginResponse::Append(PluginSearchResult {
-                                id: id as u32,
-                                name: name.to_owned(),
-                                description: display_uri,
-                                icon: Some(IconSource::Mime(Cow::Owned(mime.to_string()))),
-                                ..Default::default()
-                            }),
-                        )
-                        .await;
+                if !query.split_whitespace().all(|key| lowername.contains(key)) {
+                    continue;
+                }
 
-                        if id == 19 {
-                            break;
-                        }
+                if let Some(mime) = new_mime_guess::from_path(&item.href).first() {
+                    let id = self.uris.insert(item.href.clone());
+                    crate::send(
+                        &mut self.out,
+                        PluginResponse::Append(PluginSearchResult {
+                            id: id as u32,
+                            name: name.to_owned(),
+                            description: display_uri,
+                            icon: Some(IconSource::Mime(Cow::Owned(mime.to_string()))),
+                            ..Default::default()
+                        }),
+                    )
+                    .await;
+
+                    if id == 19 {
+                        break;
                     }
                 }
             }
@@ -102,4 +131,29 @@ fn normalized(input: &str) -> Option<String> {
     input
         .find(' ')
         .map(|pos| input[pos + 1..].trim().to_ascii_lowercase())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_recently_used;
+
+    #[test]
+    fn parses_bookmark_hrefs_from_a_desktop_xbel_document() {
+        let recent = parse_recently_used(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<xbel xmlns:bookmark="http://www.freedesktop.org/standards/desktop-bookmarks"
+      xmlns:mime="http://www.freedesktop.org/standards/shared-mime-info">
+  <bookmark href="file:///home/test/My%20Document.txt" added="2026-08-15T12:00:00Z">
+    <info><metadata owner="http://freedesktop.org"><mime:mime-type type="text/plain"/></metadata></info>
+  </bookmark>
+</xbel>"#,
+        )
+        .expect("valid XBEL should parse");
+
+        assert_eq!(recent.bookmarks.len(), 1);
+        assert_eq!(
+            recent.bookmarks[0].href,
+            "file:///home/test/My%20Document.txt"
+        );
+    }
 }

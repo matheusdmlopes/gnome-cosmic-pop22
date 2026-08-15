@@ -24,7 +24,6 @@ use pop_launcher::{
 };
 use regex::Regex;
 use slab::Slab;
-use std::usize;
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
@@ -475,10 +474,12 @@ impl<O: futures::Sink<Response> + Unpin> Service<O> {
 
         for (key, plugin) in self.plugins.iter_mut() {
             // Avoid sending queries to plugins which are not matched
-            if let Some(regex) = plugin.regex.as_ref() {
-                if !regex.is_match(query) {
-                    continue;
-                }
+            if plugin
+                .regex
+                .as_ref()
+                .is_some_and(|regex| !regex.is_match(query))
+            {
+                continue;
             }
 
             if requires_persistence && !plugin.config.query.persistent {
@@ -490,41 +491,47 @@ impl<O: futures::Sink<Response> + Unpin> Service<O> {
                 break;
             }
 
-            if let Some(regex) = plugin.isolate_regex.as_ref() {
-                if regex.is_match(query) {
-                    isolated = Some(key);
-                    break;
-                }
+            if plugin
+                .isolate_regex
+                .as_ref()
+                .is_some_and(|regex| regex.is_match(query))
+            {
+                isolated = Some(key);
+                break;
             }
 
             query_queue.push(key);
         }
 
         if let Some(isolated) = isolated {
-            if let Some(plugin) = self.plugins.get_mut(isolated) {
+            let Some(plugin) = self.plugins.get_mut(isolated) else {
+                return;
+            };
+
+            if plugin
+                .sender_exec()
+                .send_async(Request::Search(query.to_owned()))
+                .await
+                .is_ok()
+            {
+                self.awaiting_results.insert(isolated);
+                self.no_sort = plugin.config.query.no_sort;
+            }
+        } else {
+            self.no_sort = query.is_empty();
+
+            for plugin_id in query_queue {
+                let Some(plugin) = self.plugins.get_mut(plugin_id) else {
+                    continue;
+                };
+
                 if plugin
                     .sender_exec()
                     .send_async(Request::Search(query.to_owned()))
                     .await
                     .is_ok()
                 {
-                    self.awaiting_results.insert(isolated);
-                    self.no_sort = plugin.config.query.no_sort;
-                }
-            }
-        } else {
-            self.no_sort = query.is_empty();
-
-            for plugin_id in query_queue {
-                if let Some(plugin) = self.plugins.get_mut(plugin_id) {
-                    if plugin
-                        .sender_exec()
-                        .send_async(Request::Search(query.to_owned()))
-                        .await
-                        .is_ok()
-                    {
-                        self.awaiting_results.insert(plugin_id);
-                    }
+                    self.awaiting_results.insert(plugin_id);
                 }
             }
         }
@@ -719,7 +726,7 @@ mod tests {
     #[test]
     fn test_script_calculate_weight() {
         // Test queries for each of the prompt's entries
-        let entries = vec![
+        let entries = [
             (
                 "Enter BIOS",
                 PluginSearchResult {
