@@ -278,13 +278,18 @@ class DockPage(Adw.PreferencesPage):
         except Exception:
             pass
 
-        # 9. Favorite Apps (Launcher, Workspaces, Applications)
+        # 9. Applications Icon in Dock (dash-to-dock show-show-apps-button)
+        try:
+            self.settings.bind("show-show-apps-button", self.apps_item_row, "active", Gio.SettingsBindFlags.DEFAULT)
+        except Exception:
+            pass
+
+        # 10. Favorite Apps (Launcher, Workspaces)
         if self.shell_settings:
             def update_favorites_ui():
                 favs = self.shell_settings.get_strv("favorite-apps")
                 self.launcher_item_row.set_active("pop-cosmic-launcher.desktop" in favs)
                 self.workspaces_item_row.set_active("pop-cosmic-workspaces.desktop" in favs)
-                self.apps_item_row.set_active("pop-cosmic-applications.desktop" in favs)
 
             def toggle_fav(app_id: str, is_active: bool):
                 favs = list(self.shell_settings.get_strv("favorite-apps"))
@@ -303,10 +308,6 @@ class DockPage(Adw.PreferencesPage):
             self.workspaces_item_row.connect(
                 "notify::active",
                 lambda *a: toggle_fav("pop-cosmic-workspaces.desktop", self.workspaces_item_row.get_active())
-            )
-            self.apps_item_row.connect(
-                "notify::active",
-                lambda *a: toggle_fav("pop-cosmic-applications.desktop", self.apps_item_row.get_active())
             )
             self.shell_settings.connect("changed::favorite-apps", lambda *a: update_favorites_ui())
 

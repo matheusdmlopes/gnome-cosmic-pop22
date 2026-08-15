@@ -1,0 +1,16 @@
+*.zip
+*.swp
+_build
+target
+schemas/gschemas.compiled
+debian/*
+!debian/source
+!debian/changelog
+!debian/control
+!debian/copyright
+!debian/rules
+!debian/*install
+.confirm_shortcut_change
+.vscode
+node_modules
+tsconfig.tsbuildinfo

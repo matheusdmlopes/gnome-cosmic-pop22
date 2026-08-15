@@ -1,0 +1,11 @@
+#!/bin/sh
+# Launcher for the Pop Settings application.
+#
+# The library path below is substituted from the install prefix by
+# `make install-settings`. Runs against the system Python and system
+# PyGObject, so no virtualenv or uv is needed once the suite is installed.
+
+PYTHONPATH="@PYTHON_LIB@${PYTHONPATH:+:${PYTHONPATH}}"
+export PYTHONPATH
+
+exec python3 -m pop_settings "$@"

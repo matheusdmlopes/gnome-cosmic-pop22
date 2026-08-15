@@ -21,10 +21,12 @@ gschemas.compiled
 target/
 _build/
 
-# External Upstream Projects & Legacy components
-launcher/
-shell/
+# Legacy component, superseded by pop-settings (see docs/adr/0001)
 desktop-widget/
+
+# Vendored Rust build artifacts inside launcher/
+launcher/vendor/
+launcher/vendor.tar
 
 # Raw wallpaper edit sources (>50MB)
 wallpapers/edit-sources/

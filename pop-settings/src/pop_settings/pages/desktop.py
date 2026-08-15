@@ -1,11 +1,36 @@
+from __future__ import annotations
+
+from typing import Optional
+
 from gi.repository import Adw, Gtk, Gio
 from pop_settings.schema_helper import get_settings
+from pop_settings.extension_monitor import ExtensionMonitor
+from pop_settings.widgets import ExtensionStatusBanner
+
+_POP_COSMIC_UUID = "pop-cosmic@system76.com"
+
 
 class DesktopPage(Adw.PreferencesPage):
-    def __init__(self):
+    """Desktop and Top Bar settings page.
+
+    Optionally receives an ExtensionMonitor so the status banner can warn
+    when the pop-cosmic extension is not active in GNOME Shell.
+    """
+
+    def __init__(
+        self,
+        extension_monitor: Optional[ExtensionMonitor] = None,
+    ) -> None:
         super().__init__()
         self.set_title("Desktop and Top Bar")
         self.set_icon_name("preferences-desktop-display-symbolic")
+
+        self.extension_banner = ExtensionStatusBanner(
+            _POP_COSMIC_UUID,
+            "Pop COSMIC extension is not active. Some settings may not take effect.",
+            extension_monitor,
+        )
+        self.add(self.extension_banner)
 
         self.settings = get_settings("org.gnome.shell.extensions.pop-cosmic")
 

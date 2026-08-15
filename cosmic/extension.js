@@ -8,6 +8,7 @@ import St from 'gi://St';
 
 import * as AltTab from 'resource:///org/gnome/shell/ui/altTab.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as OverviewControls from 'resource:///org/gnome/shell/ui/overviewControls.js';
 import * as SwitcherPopup from 'resource:///org/gnome/shell/ui/switcherPopup.js';
 import * as Util from 'resource:///org/gnome/shell/misc/util.js';
 import { Extension, gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -260,16 +261,50 @@ function gnome_40_enable(ext) {
     applications.enable(ext);
 
     const overview_show_orig = Main.overview.show;
-    inject(Main.overview, 'show', function(...args) {
-        overview_show_orig.apply(this, args);
+    const overview_hide_orig = Main.overview.hide;
+
+    inject(Main.overview, 'show', function(state) {
+        if (state === OverviewControls.ControlsState?.APP_GRID || state === 2) {
+            if (Main.overview.visible)
+                overview_hide_orig.call(this);
+            overview_toggle(OVERVIEW_APPLICATIONS);
+            return;
+        }
+        overview_show_orig.apply(this, arguments);
         applications.hide();
     });
 
-    const overview_hide_orig = Main.overview.hide;
+    const overview_showApps_orig = Main.overview.showApps;
+    if (overview_showApps_orig) {
+        inject(Main.overview, 'showApps', function() {
+            if (Main.overview.visible)
+                overview_hide_orig.call(this);
+            overview_toggle(OVERVIEW_APPLICATIONS);
+        });
+    }
+
     inject(Main.overview, 'hide', function(...args) {
         overview_hide_orig.apply(this, args);
         applications.hide();
     });
+
+    const controls = Main.overview._overview?._controls;
+    if (controls) {
+        if (controls._onShowAppsButtonToggled) {
+            inject(controls, '_onShowAppsButtonToggled', function() {
+                if (Main.overview.visible)
+                    overview_hide_orig.call(Main.overview);
+                overview_toggle(OVERVIEW_APPLICATIONS);
+            });
+        }
+        if (controls._toggleAppsPage) {
+            inject(controls, '_toggleAppsPage', function() {
+                if (Main.overview.visible)
+                    overview_hide_orig.call(Main.overview);
+                overview_toggle(OVERVIEW_APPLICATIONS);
+            });
+        }
+    }
 }
 
 function gnome_40_disable() {

@@ -1,0 +1,48 @@
+# Maintainer: De Marco Tech <contato@demarcotech.com.br>
+
+pkgname=gnome-cosmic-pop22
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Pop COSMIC desktop experience for GNOME Shell 48+ - extensions, settings app, themes, icons, and wallpapers"
+arch=('any')
+url="https://github.com/matheusdmlopes/gnome-cosmic-pop22"
+license=('GPL-3.0-or-later')
+depends=(
+    'gnome-shell>=45'
+    'python>=3.10'
+    'python-gobject'
+    'libadwaita'
+    'gtk4'
+)
+makedepends=(
+    'gjs'
+    'nodejs'
+    'typescript'
+    'rust'
+    'glib2'
+    'desktop-file-utils'
+    'python'
+    'uv'
+)
+provides=(
+    'pop-cosmic'
+    'cosmic-workspaces'
+    'pop-settings'
+)
+source=("git+https://github.com/matheusdmlopes/gnome-cosmic-pop22.git")
+sha256sums=('SKIP')
+
+build() {
+    cd "$srcdir/$pkgname"
+    make build
+}
+
+check() {
+    cd "$srcdir/$pkgname"
+    make test
+}
+
+package() {
+    cd "$srcdir/$pkgname"
+    make install PREFIX=/usr DESTDIR="$pkgdir"
+}

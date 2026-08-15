@@ -44,10 +44,6 @@ class CosmicTopBarButton extends PanelMenu.Button {
 
         this.label_actor = this._label;
 
-        this.connect('clicked', () => {
-            this.toggle();
-        });
-
         const perform_update = () => this.update();
 
         const signals = [

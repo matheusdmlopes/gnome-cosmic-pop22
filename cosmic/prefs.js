@@ -4,98 +4,131 @@ import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk';
 import { ExtensionPreferences, gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
+const POP_SETTINGS_DESKTOP_ID = 'pop-settings.desktop';
+const POP_SETTINGS_COMMAND = 'pop-settings';
+
+// Resolve Pop Settings through the desktop entry first, then through the
+// command on PATH. Never hardcode an install location: the suite has to work
+// from any user account and any prefix.
+function pop_settings_app_info() {
+    const desktop_app = Gio.DesktopAppInfo.new(POP_SETTINGS_DESKTOP_ID);
+    if (desktop_app !== null)
+        return desktop_app;
+
+    if (GLib.find_program_in_path(POP_SETTINGS_COMMAND) === null)
+        return null;
+
+    try {
+        return Gio.AppInfo.create_from_commandline(
+            POP_SETTINGS_COMMAND,
+            _('Pop Settings'),
+            Gio.AppInfoCreateFlags.NONE
+        );
+    } catch (e) {
+        console.error(`pop-cosmic: cannot build launcher for Pop Settings: ${e}`);
+        return null;
+    }
+}
+
+// Build the row that opens Pop Settings. When Pop Settings is not installed
+// the row stays visible but insensitive, so the preferences dialog degrades
+// quietly instead of offering a button that fails.
+function pop_settings_group() {
+    const group = new Adw.PreferencesGroup({
+        title: _('Settings Center'),
+        description: _('Open the integrated Pop COSMIC panel to configure every desktop option.'),
+    });
+
+    const app_info = pop_settings_app_info();
+
+    const row = new Adw.ActionRow({
+        title: _('Pop Settings'),
+        subtitle: app_info !== null
+            ? _('Open the full Pop COSMIC settings application.')
+            : _('Pop Settings is not installed on this system.'),
+    });
+
+    const button = new Gtk.Button({
+        label: _('Open Pop Settings'),
+        valign: Gtk.Align.CENTER,
+        css_classes: ['suggested-action'],
+        sensitive: app_info !== null,
+    });
+
+    button.connect('clicked', () => {
+        try {
+            app_info?.launch([], null);
+        } catch (e) {
+            console.error(`pop-cosmic: failed to launch Pop Settings: ${e}`);
+        }
+    });
+
+    row.add_suffix(button);
+    row.set_activatable_widget(button);
+    group.add(row);
+
+    return group;
+}
+
 export default class PopCosmicPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings();
-        const page = new Adw.PreferencesPage();
-        page.set_title(_("Pop COSMIC"));
-        page.set_icon_name("preferences-desktop-display-symbolic");
-
-        // Grupo: Central Pop Settings
-        const centralGroup = new Adw.PreferencesGroup({
-            title: _("Central de Configurações"),
-            description: _("Acesse o painel integrado do Pop COSMIC para configurar todas as opções do desktop.")
+        const page = new Adw.PreferencesPage({
+            title: _('Pop COSMIC'),
+            icon_name: 'preferences-desktop-display-symbolic',
         });
 
-        const centralActionRow = new Adw.ActionRow({
-            title: _("Pop Settings"),
-            subtitle: _("Abrir o aplicativo completo de configurações do Pop COSMIC.")
+        page.add(pop_settings_group());
+
+        const top_bar_group = new Adw.PreferencesGroup({
+            title: _('Top Bar'),
+            description: _('Settings specific to this extension.'),
         });
 
-        const centralButton = new Gtk.Button({
-            label: _("Abrir Pop Settings"),
-            valign: Gtk.Align.CENTER,
-            css_classes: ['suggested-action']
+        const workspaces_row = new Adw.SwitchRow({
+            title: _('Workspaces Button'),
+            subtitle: _('Show the workspace switcher button on the top bar.'),
         });
+        settings.bind('show-workspaces-button', workspaces_row, 'active', Gio.SettingsBindFlags.DEFAULT);
+        top_bar_group.add(workspaces_row);
 
-        centralButton.connect('clicked', () => {
-            try {
-                GLib.spawn_command_line_async("uv --directory /home/matheusdm/Desktop/projetos/pop22/pop-settings run python -m pop_settings");
-            } catch (e) {
-                console.error(`Failed to launch pop-settings: ${e}`);
-            }
+        const applications_row = new Adw.SwitchRow({
+            title: _('Applications Button'),
+            subtitle: _('Show the Pop application drawer button on the top bar.'),
         });
+        settings.bind('show-applications-button', applications_row, 'active', Gio.SettingsBindFlags.DEFAULT);
+        top_bar_group.add(applications_row);
 
-        centralActionRow.add_suffix(centralButton);
-        centralActionRow.set_activatable_widget(centralButton);
-        centralGroup.add(centralActionRow);
-        page.add(centralGroup);
+        const app_menu_row = new Adw.SwitchRow({
+            title: _('Application Menu'),
+            subtitle: _('Show the focused application menu on the top bar.'),
+        });
+        settings.bind('show-application-menu', app_menu_row, 'active', Gio.SettingsBindFlags.DEFAULT);
+        top_bar_group.add(app_menu_row);
 
-        // Grupo: Barra Superior
-        const topBarGroup = new Adw.PreferencesGroup({
-            title: _("Barra Superior"),
-            description: _("Ajustes individuais para esta extensão.")
+        const clock_row = new Adw.ComboRow({
+            title: _('Clock Position'),
+            subtitle: _('Alignment of the date and time on the top bar.'),
+            model: Gtk.StringList.new([_('Center'), _('Left'), _('Right')]),
         });
+        clock_row.set_selected(settings.get_enum('clock-alignment'));
+        clock_row.connect('notify::selected', () => {
+            settings.set_enum('clock-alignment', clock_row.get_selected());
+        });
+        top_bar_group.add(clock_row);
 
-        // Workspaces Button
-        const workspacesRow = new Adw.SwitchRow({
-            title: _("Botão Workspaces"),
-            subtitle: _("Exibe o botão de alternância de áreas de trabalho no painel.")
+        const super_row = new Adw.ComboRow({
+            title: _('Super Key Action'),
+            subtitle: _('Behavior triggered by pressing the Super key.'),
+            model: Gtk.StringList.new([_('Workspaces'), _('Applications'), _('Pop Launcher')]),
         });
-        settings.bind("show-workspaces-button", workspacesRow, "active", Gio.SettingsBindFlags.DEFAULT);
-        topBarGroup.add(workspacesRow);
+        super_row.set_selected(settings.get_enum('overlay-key-action'));
+        super_row.connect('notify::selected', () => {
+            settings.set_enum('overlay-key-action', super_row.get_selected());
+        });
+        top_bar_group.add(super_row);
 
-        // Applications Button
-        const appsRow = new Adw.SwitchRow({
-            title: _("Botão Applications"),
-            subtitle: _("Exibe o botão da gaveta de aplicativos Pop no painel.")
-        });
-        settings.bind("show-applications-button", appsRow, "active", Gio.SettingsBindFlags.DEFAULT);
-        topBarGroup.add(appsRow);
-
-        // App Menu
-        const appMenuRow = new Adw.SwitchRow({
-            title: _("Menu da Aplicação"),
-            subtitle: _("Exibe o menu do aplicativo ativo no painel.")
-        });
-        settings.bind("show-application-menu", appMenuRow, "active", Gio.SettingsBindFlags.DEFAULT);
-        topBarGroup.add(appMenuRow);
-
-        // Clock Alignment
-        const clockRow = new Adw.ComboRow({
-            title: _("Posição do Relógio"),
-            subtitle: _("Alinhamento da data e hora no painel superior."),
-            model: Gtk.StringList.new([_("Centro"), _("Esquerda"), _("Direita")])
-        });
-        clockRow.set_selected(settings.get_enum("clock-alignment"));
-        clockRow.connect("notify::selected", () => {
-            settings.set_enum("clock-alignment", clockRow.get_selected());
-        });
-        topBarGroup.add(clockRow);
-
-        // Super Key Action
-        const superRow = new Adw.ComboRow({
-            title: _("Ação da Tecla Super"),
-            subtitle: _("Comportamento ao pressionar a tecla Super."),
-            model: Gtk.StringList.new([_("Workspaces"), _("Applications"), _("Pop Launcher")])
-        });
-        superRow.set_selected(settings.get_enum("overlay-key-action"));
-        superRow.connect("notify::selected", () => {
-            settings.set_enum("overlay-key-action", superRow.get_selected());
-        });
-        topBarGroup.add(superRow);
-
-        page.add(topBarGroup);
+        page.add(top_bar_group);
         window.add(page);
     }
 }

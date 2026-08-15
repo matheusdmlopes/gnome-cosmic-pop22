@@ -52,6 +52,11 @@ def test_dock_page_init():
     assert page.multimonitor_row is not None
     assert page.icon_size_row is not None
     assert page.click_action_row is not None
+    assert page.apps_item_row is not None
+    assert page.launcher_item_row is not None
+    assert page.workspaces_item_row is not None
+    assert page.mounts_row is not None
+    assert page.trash_row is not None
 
 def test_appearance_page_init():
     page = AppearancePage()

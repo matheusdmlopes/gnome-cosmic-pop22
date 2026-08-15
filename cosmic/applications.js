@@ -1093,7 +1093,10 @@ class CosmicAppsDialog extends CosmicModalDialog {
                          actor._delegate instanceof PopupMenu ||
                          (actor instanceof AppDisplay.AppIcon &&
                           actor.app?.id === "pop-cosmic-applications.desktop") ||
-                         actor === Main.panel.statusArea['cosmic_applications'])
+                         actor === Main.panel.statusArea['cosmic_applications'] ||
+                         actor === Main.overview.dash?.showAppsButton ||
+                         actor.has_style_class_name?.('show-apps') ||
+                         actor._delegate?.has_style_class_name?.('show-apps'))
                     return true;
                 else
                     return has_excluded_ancestor.call(this, actor.get_parent());
@@ -1269,17 +1272,38 @@ class CosmicAppsDialog extends CosmicModalDialog {
     hideDialog() {
         this.close();
 
-        const cosmicDock = Main.extensionManager.lookup("cosmic-dock@system76.com");
-        if (cosmicDock && cosmicDock.state === 1 && cosmicDock.stateObj) {
-            const dockManager = cosmicDock.stateObj.dockManager;
-            if (dockManager && dockManager._allDocks) {
-                dockManager._allDocks.forEach((dock) => dock._onOverviewHiding?.());
-            }
-        }
-
+        resetDockShowAppsButton();
         Main.panel.statusArea['cosmic_applications']?.update();
     }
 });
+
+function resetDockShowAppsButton() {
+    if (Main.overview.dash?.showAppsButton && Main.overview.dash.showAppsButton.checked) {
+        Main.overview.dash.showAppsButton.checked = false;
+    }
+
+    const dockUuids = [
+        "dash-to-dock@micxgx.gmail.com",
+        "cosmic-dock@system76.com",
+        "ubuntu-dock@ubuntu.com",
+    ];
+
+    for (const uuid of dockUuids) {
+        const ext = Main.extensionManager.lookup(uuid);
+        if (ext && ext.state === 1 && ext.stateObj) {
+            const dockManager = ext.stateObj.dockManager || ext.stateObj._dockManager;
+            const allDocks = dockManager?.allDocks || dockManager?._allDocks;
+            if (allDocks) {
+                allDocks.forEach((dock) => {
+                    if (dock.dash?.showAppsButton && dock.dash.showAppsButton.checked) {
+                        dock.dash.showAppsButton.checked = false;
+                    }
+                    dock._onOverviewHiding?.();
+                });
+            }
+        }
+    }
+}
 
 export function enable(ext = null) {
     extensionInstance = ext;

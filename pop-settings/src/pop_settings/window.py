@@ -6,12 +6,16 @@ from pop_settings.pages import (
     DockPage,
     AppearancePage,
 )
+from pop_settings.extension_monitor import ExtensionMonitor
 
 class PopSettingsWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.set_title("Pop Settings")
         self.set_default_size(860, 640)
+
+        # Extension status monitor (D-Bus, gracefully degrades)
+        self.extension_monitor = ExtensionMonitor()
 
         # Toolbar View
         toolbar_view = Adw.ToolbarView()
@@ -42,9 +46,9 @@ class PopSettingsWindow(Adw.ApplicationWindow):
         )
 
         # Add the 5 modular pages
-        self.desktop_page = DesktopPage()
-        self.workspaces_page = WorkspacesPage()
-        self.tiling_page = TilingPage()
+        self.desktop_page = DesktopPage(extension_monitor=self.extension_monitor)
+        self.workspaces_page = WorkspacesPage(extension_monitor=self.extension_monitor)
+        self.tiling_page = TilingPage(extension_monitor=self.extension_monitor)
         self.dock_page = DockPage()
         self.appearance_page = AppearancePage()
 

@@ -1,11 +1,36 @@
+from __future__ import annotations
+
+from typing import Optional
+
 from gi.repository import Adw, Gtk, Gio
 from pop_settings.schema_helper import get_settings
+from pop_settings.extension_monitor import ExtensionMonitor
+from pop_settings.widgets import ExtensionStatusBanner
+
+_POP_SHELL_UUID = "pop-shell@system76.com"
+
 
 class TilingPage(Adw.PreferencesPage):
-    def __init__(self):
+    """Pop Shell tiling window manager settings.
+
+    Optionally receives an ExtensionMonitor so the status banner can warn
+    when the pop-shell extension is not active in GNOME Shell.
+    """
+
+    def __init__(
+        self,
+        extension_monitor: Optional[ExtensionMonitor] = None,
+    ) -> None:
         super().__init__()
         self.set_title("Tile Windows")
         self.set_icon_name("preferences-desktop-windows-symbolic")
+
+        self.extension_banner = ExtensionStatusBanner(
+            _POP_SHELL_UUID,
+            "Pop Shell extension is not active. Tiling settings will not take effect.",
+            extension_monitor,
+        )
+        self.add(self.extension_banner)
 
         self.settings = get_settings("org.gnome.shell.extensions.pop-shell")
 
@@ -67,6 +92,38 @@ class TilingPage(Adw.PreferencesPage):
         self.smart_gaps_row.set_subtitle("Hide outer gaps when only one window is open on the workspace")
         gaps_group.add(self.smart_gaps_row)
 
+        # Group: Window and Mouse Behavior
+        behavior_group = Adw.PreferencesGroup()
+        behavior_group.set_title("Window and Mouse Behavior")
+        behavior_group.set_description("Fine-tune how the pointer and the launcher interact with tiled windows")
+        self.add(behavior_group)
+
+        # Stacking with mouse
+        self.stacking_mouse_row = Adw.SwitchRow()
+        self.stacking_mouse_row.set_title("Stack Windows with the Mouse")
+        self.stacking_mouse_row.set_subtitle("Drop a dragged window onto another to stack them in the same tile")
+        behavior_group.add(self.stacking_mouse_row)
+
+        # Cursor follows active window
+        self.cursor_follows_row = Adw.SwitchRow()
+        self.cursor_follows_row.set_title("Mouse Cursor Follows Active Window")
+        self.cursor_follows_row.set_subtitle("Warp the pointer to the window focused by keyboard navigation")
+        behavior_group.add(self.cursor_follows_row)
+
+        # Launcher over fullscreen windows
+        self.fullscreen_launcher_row = Adw.SwitchRow()
+        self.fullscreen_launcher_row.set_title("Launcher Over Fullscreen Windows")
+        self.fullscreen_launcher_row.set_subtitle("Allow the Pop Launcher to appear on top of fullscreen windows")
+        behavior_group.add(self.fullscreen_launcher_row)
+
+        # Active hint border radius
+        self.hint_radius_row = Adw.SpinRow()
+        self.hint_radius_row.set_title("Active Hint Border Radius")
+        self.hint_radius_row.set_subtitle("Corner rounding of the focused window highlight, in pixels")
+        radius_adj = Gtk.Adjustment(value=0, lower=0, upper=30, step_increment=1, page_increment=5)
+        self.hint_radius_row.set_adjustment(radius_adj)
+        behavior_group.add(self.hint_radius_row)
+
         self._bind_settings()
 
     def _bind_settings(self):
@@ -80,3 +137,7 @@ class TilingPage(Adw.PreferencesPage):
         self.settings.bind("smart-gaps", self.smart_gaps_row, "active", Gio.SettingsBindFlags.DEFAULT)
         self.settings.bind("gap-inner", self.inner_gap_row, "value", Gio.SettingsBindFlags.DEFAULT)
         self.settings.bind("gap-outer", self.outer_gap_row, "value", Gio.SettingsBindFlags.DEFAULT)
+        self.settings.bind("stacking-with-mouse", self.stacking_mouse_row, "active", Gio.SettingsBindFlags.DEFAULT)
+        self.settings.bind("mouse-cursor-follows-active-window", self.cursor_follows_row, "active", Gio.SettingsBindFlags.DEFAULT)
+        self.settings.bind("fullscreen-launcher", self.fullscreen_launcher_row, "active", Gio.SettingsBindFlags.DEFAULT)
+        self.settings.bind("active-hint-border-radius", self.hint_radius_row, "value", Gio.SettingsBindFlags.DEFAULT)

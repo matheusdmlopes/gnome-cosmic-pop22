@@ -37,19 +37,31 @@ export function overview_show(kind) {
         applications.hide();
         Main.overview.show();
     } else if (kind === OVERVIEW_APPLICATIONS) {
-        Main.overview.hide();
+        if (Main.overview.visible) {
+            Main.overview.hide();
+        }
         applications.show();
     } else if (kind === OVERVIEW_LAUNCHER) {
-        Main.overview.hide();
+        if (Main.overview.visible) {
+            Main.overview.hide();
+        }
         let launched = false;
-        with_pop_shell((ext) => {
-            if (ext.window_search) {
+        // The Pop Launcher lives in a separate service process. If it is not
+        // installed, or its D-Bus service fails to answer, fall back to the
+        // applications drawer rather than leaving the Super key doing nothing.
+        try {
+            with_pop_shell((ext) => {
+                if (!ext.window_search)
+                    return;
                 ext.tiler?.exit?.(ext);
-                ext.window_search?.load_desktop_files?.();
-                ext.window_search?.open?.(ext);
+                ext.window_search.load_desktop_files?.();
+                ext.window_search.open(ext);
                 launched = true;
-            }
-        });
+            });
+        } catch (e) {
+            console.error(`pop-cosmic: Pop Launcher unavailable, falling back to the applications drawer: ${e}`);
+            launched = false;
+        }
         if (!launched) {
             applications.show();
         }

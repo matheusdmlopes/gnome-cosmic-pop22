@@ -1,11 +1,36 @@
+from __future__ import annotations
+
+from typing import Optional
+
 from gi.repository import Adw, Gtk, Gio
 from pop_settings.schema_helper import get_settings
+from pop_settings.extension_monitor import ExtensionMonitor
+from pop_settings.widgets import ExtensionStatusBanner
+
+_WORKSPACES_UUID = "cosmic-workspaces@system76.com"
+
 
 class WorkspacesPage(Adw.PreferencesPage):
-    def __init__(self):
+    """Workspaces settings page.
+
+    Optionally receives an ExtensionMonitor so the status banner can warn
+    when the cosmic-workspaces extension is not active in GNOME Shell.
+    """
+
+    def __init__(
+        self,
+        extension_monitor: Optional[ExtensionMonitor] = None,
+    ) -> None:
         super().__init__()
         self.set_title("Workspaces")
         self.set_icon_name("view-paged-symbolic")
+
+        self.extension_banner = ExtensionStatusBanner(
+            _WORKSPACES_UUID,
+            "Cosmic Workspaces extension is not active. Some settings may not take effect.",
+            extension_monitor,
+        )
+        self.add(self.extension_banner)
 
         self.settings = get_settings("org.gnome.shell.extensions.cosmic-workspaces")
         self.mutter_settings = get_settings("org.gnome.mutter")
