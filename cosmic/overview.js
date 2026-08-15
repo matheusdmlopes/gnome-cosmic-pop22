@@ -16,6 +16,8 @@ export const OVERVIEW_WORKSPACES = 0;
 export const OVERVIEW_APPLICATIONS = 1;
 export const OVERVIEW_LAUNCHER = 2;
 
+const LAUNCHER_UNAVAILABLE = 'unavailable';
+
 export function overview_visible(kind) {
     if (kind === OVERVIEW_WORKSPACES) {
         return Main.overview.visible && !applications.visible();
@@ -59,19 +61,17 @@ export function overview_show(kind) {
         try {
             outcome = with_pop_shell((ext) => {
                 if (!ext.window_search)
-                    return 'unavailable';
+                    return LAUNCHER_UNAVAILABLE;
                 ext.tiler?.exit?.(ext);
                 ext.window_search.load_desktop_files?.();
-                // A pop-shell older than this one returns nothing; assume it
-                // opened, which is what this extension always assumed.
-                return ext.window_search.open(ext) ?? 'opened';
+                return ext.window_search.open(ext);
             });
         } catch (e) {
             console.error(`pop-cosmic: Pop Launcher unavailable, falling back to the applications drawer: ${e}`);
-            outcome = 'unavailable';
+            outcome = LAUNCHER_UNAVAILABLE;
         }
         // undefined means pop-shell is not loaded at all.
-        if ((outcome ?? 'unavailable') === 'unavailable') {
+        if ((outcome ?? LAUNCHER_UNAVAILABLE) === LAUNCHER_UNAVAILABLE) {
             applications.show();
         }
     } else {

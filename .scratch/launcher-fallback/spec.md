@@ -79,10 +79,10 @@ Além disso, o serviço do launcher passa a ser observado durante a vida toda, e
 4. An orderly shutdown requested through exit does not report service loss.
 5. An exception thrown by the response handler does not report service loss.
 6. A malformed, non-JSON line does not report service loss and does not escape as an unhandled error.
-7. A loss report from a superseded service instance does not clear a newer one.
+7. A service instance reports its loss at most once, and an intentional `exit()` does not trigger another loss report.
 8. After a service is lost, its streams are closed rather than leaked.
 
-**Not covered by automation.** The open-attempt outcome itself and the fallback decision in the consuming extension both sit behind GNOME Shell modal and overview APIs that cannot be loaded outside a live session. These stay manual, which is the same conclusion the earlier launcher issue reached, and the manual check is: with the launcher binary removed from the path, the Super key must open the applications drawer.
+**Not covered by automation.** The superseded-instance guard lives in `Launcher`, and that class, the open-attempt outcome, and the fallback decision in the consuming extension all sit behind GNOME Shell APIs that cannot be loaded outside a live session. The launcher-service seam covers the reachable contract instead: one loss report per instance, with no report after intentional exit. The Shell-only paths stay manual, which is the same conclusion the earlier launcher issue reached, and the manual check is: with the launcher binary removed from the path, the Super key must open the applications drawer.
 
 ## Out of Scope
 

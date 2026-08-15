@@ -1,7 +1,6 @@
 import * as utils from './utils.js';
 import * as log from './log.js';
 
-import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 const { byteArray } = imports;
 
@@ -12,6 +11,7 @@ const { byteArray } = imports;
  */
 export class LauncherService {
     service: utils.AsyncIPC;
+    private exited: boolean = false;
 
     /** @param on_lost Called when the service goes away on its own: end of
      * stream, or a read error that is not our own cancellation. It is never
@@ -21,26 +21,45 @@ export class LauncherService {
 
         /** Recursively registers an intent to read the next line asynchronously  */
         const generator = (stdout: any, res: any) => {
+            let bytes: any;
             try {
-                const [bytes] = stdout.read_line_finish(res);
-                if (bytes) {
-                    const string = byteArray.toString(bytes);
-                    // log.debug(`received response from launcher service: ${string}`)
-                    callback(JSON.parse(string));
-                    this.service.stdout.read_line_async(0, this.service.cancellable, generator);
-                } else {
-                    // End of stream: the process closed stdout, so no further
-                    // request will ever be answered.
-                    on_lost();
-                }
+                [bytes] = stdout.read_line_finish(res);
             } catch (why) {
-                // Do not print an error if it was merely cancelled.
-                if ((why as any).matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) {
+                if (this.exited) {
                     return;
                 }
 
                 log.error(`failed to read response from launcher service: ${why}`);
                 on_lost();
+                return;
+            }
+
+            if (bytes === null) {
+                // End of stream: the process closed stdout, so no further
+                // request will ever be answered.
+                if (!this.exited) {
+                    on_lost();
+                }
+                return;
+            }
+
+            const string = byteArray.toString(bytes);
+            try {
+                const parsed = JSON.parse(string);
+                callback(parsed);
+            } catch (why) {
+                log.error(`failed to process response from launcher service: ${why}`);
+            }
+
+            if (!this.exited) {
+                try {
+                    this.service.stdout.read_line_async(0, this.service.cancellable, generator);
+                } catch (why) {
+                    if (!this.exited) {
+                        log.error(`failed to schedule read on launcher service: ${why}`);
+                        on_lost();
+                    }
+                }
             }
         };
 
@@ -64,6 +83,9 @@ export class LauncherService {
     }
 
     exit() {
+        if (this.exited) return;
+        this.exited = true;
+
         this.send('Exit');
         this.service.cancellable.cancel();
         const service = this.service;
@@ -73,14 +95,16 @@ export class LauncherService {
 
             const close_stream = (stream: any) => {
                 try {
-                    stream.close(null);
+                    if (stream && !stream.is_closed()) {
+                        stream.close(null);
+                    }
                 } catch (why) {
                     log.error(`failed to close pop-launcher stream: ${why}`);
                 }
             };
 
             close_stream(service.stdin);
-            close_stream(service.stdin);
+            close_stream(service.stdout);
 
             // service.child.send_signal(15)
 

@@ -36,7 +36,7 @@ LAUNCHER_SCRIPTS_DIR := $(LAUNCHER_LIB_DIR)/scripts
 LAUNCHER_BIN := $(BIN_DIR)/pop-launcher
 LAUNCHER_PLUGINS := calc desktop_entries files find pop_shell pulse recent scripts terminal web cosmic_toplevel
 
-.PHONY: all build build-shell build-launcher test test-syntax test-schemas test-desktop test-python venv \
+.PHONY: all build build-shell build-launcher test test-syntax test-launcher test-schemas test-desktop test-python venv \
         install install-cosmic install-workspaces install-shell install-settings install-launcher \
         install-themes install-wallpapers install-all uninstall clean
 
@@ -72,7 +72,7 @@ build-launcher:
 # Test - the three validation seams
 # ---------------------------------------------------------------------------
 
-test: test-schemas test-syntax test-desktop test-python
+test: test-schemas test-syntax test-launcher test-desktop test-python
 
 # Seam 1a: strict GSettings schema compilation.
 test-schemas:
@@ -87,6 +87,11 @@ test-schemas:
 test-syntax: build-shell
 	@echo "Validating extension ESM syntax with gjs..."
 	@gjs -c "$$(cat scripts/check-js-syntax.js)" -- cosmic/*.js cosmic-workspaces/*.js shell/_build/*.js
+
+# Seam 1c: LauncherService lifecycle and subprocess observation under gjs.
+test-launcher: build-shell
+	@echo "Running LauncherService test suite with gjs..."
+	@gjs -m scripts/test-launcher-service.js
 
 # Seam 3: desktop entry validation.
 test-desktop:

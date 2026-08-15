@@ -370,10 +370,17 @@ export class Launcher extends search.Search {
 
     /** The service process went away on its own, so the dialog on screen is a
      * dead end. Drop it rather than leaving the user typing into nothing. */
-    private on_service_lost() {
+    private on_service_lost(lost_service: service.LauncherService) {
+        if (this.service !== lost_service) {
+            return;
+        }
+
         log.error('pop-launcher service exited unexpectedly');
-        this.service = null;
-        if (this.opened) this.dismiss();
+        if (this.opened) {
+            this.dismiss();
+        } else {
+            this.stop_services(this.ext);
+        }
     }
 
     /** @returns whether a service is available to answer queries. */
@@ -386,11 +393,12 @@ export class Launcher extends search.Search {
                 return false;
             }
 
-            this.service = new service.LauncherService(
+            const current: service.LauncherService = new service.LauncherService(
                 ipc,
                 (resp) => this.on_response(resp),
-                () => this.on_service_lost(),
+                () => this.on_service_lost(current),
             );
+            this.service = current;
         }
 
         return true;
