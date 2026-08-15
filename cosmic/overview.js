@@ -1,13 +1,14 @@
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as applications from './applications.js';
 
+// lookup() hands back the extension metadata object, so the Ext instance lives
+// on stateObj. globalThis.popShell is the same object, published by pop-shell's
+// enable() as a fallback for when the lookup happens mid lifecycle.
 function with_pop_shell(callback) {
     let pop_shell = Main.extensionManager.lookup("pop-shell@system76.com");
-    if (pop_shell && pop_shell.stateObj) {
-        let ext = pop_shell.stateObj.ext || pop_shell.stateObj._ext || pop_shell.stateObj;
-        if (ext) {
-            return callback(ext);
-        }
+    let ext = pop_shell?.stateObj?.ext || globalThis.popShell;
+    if (ext) {
+        return callback(ext);
     }
 }
 
@@ -21,11 +22,10 @@ export function overview_visible(kind) {
     } else if (kind === OVERVIEW_APPLICATIONS) {
         return applications.visible();
     } else if (kind === OVERVIEW_LAUNCHER) {
-        if (with_pop_shell((ext) => {
-            return ext.window_search?.dialog?.visible;
-        }) === true) {
-            return true;
-        }
+        let is_visible = with_pop_shell((ext) => {
+            return Boolean(ext.window_search?.dialog?.visible || ext.window_search?.opened);
+        });
+        return Boolean(is_visible);
     } else {
         return Main.overview.visible;
     }
@@ -44,6 +44,9 @@ export function overview_show(kind) {
     } else if (kind === OVERVIEW_LAUNCHER) {
         if (Main.overview.visible) {
             Main.overview.hide();
+        }
+        if (applications.visible()) {
+            applications.hide();
         }
         let launched = false;
         // The Pop Launcher lives in a separate service process. If it is not
@@ -73,6 +76,7 @@ export function overview_show(kind) {
 export function overview_hide(kind) {
     if (kind === OVERVIEW_LAUNCHER) {
         with_pop_shell((ext) => {
+            ext.window_search?.close?.();
             ext.exit_modes?.();
         });
     } else if (kind === OVERVIEW_APPLICATIONS) {

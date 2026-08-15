@@ -2676,9 +2676,12 @@ let indicator: Indicator | null = null;
 
 declare global {
     var popShellExtension: any;
+    var popShell: any;
 }
 
 export default class PopShellExtension extends Extension {
+    ext: Ext | null = null;
+
     enable() {
         globalThis.popShellExtension = this;
         log.info('enable');
@@ -2690,6 +2693,10 @@ export default class PopShellExtension extends Extension {
                 if (ext?.auto_tiler) ext.snap_windows();
             });
         }
+
+        // pop-cosmic reaches the tiler and the launcher through these.
+        this.ext = ext;
+        globalThis.popShell = ext;
 
         if (ext.settings.show_skiptaskbar()) {
             _show_skip_taskbar_windows(ext);
@@ -2730,6 +2737,9 @@ export default class PopShellExtension extends Extension {
             }
 
             delete globalThis.popShellExtension;
+            delete globalThis.popShell;
+            this.ext = null;
+
             ext.injections_remove();
             ext.signals_remove();
             ext.exit_modes();

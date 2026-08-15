@@ -1076,6 +1076,13 @@ class CosmicAppsDialog extends CosmicModalDialog {
 
         this.contentLayout.add_child(box);
         this.dialogLayout._dialog.add_style_class_name('cosmic-applications-dialog');
+
+        // The dialog can also be dismissed without going through hideDialog(),
+        // for instance when the Shell drops the modal grab, so settle the
+        // buttons from the dialog's own state signals.
+        this.connect('opened', () => updateAppsButton());
+        this.connect('closed', () => resetAppsButtons());
+
         this.connect("key-press-event", (_, event) => {
             if (event.get_key_symbol() === Clutter.KEY_Escape)
                 this.hideDialog();
@@ -1266,16 +1273,24 @@ class CosmicAppsDialog extends CosmicModalDialog {
         this.appDisplay.resize(height, width);
         this.appDisplay.reset();
 
-        Main.panel.statusArea['cosmic_applications']?.update();
+        updateAppsButton();
     }
 
     hideDialog() {
         this.close();
 
-        resetDockShowAppsButton();
-        Main.panel.statusArea['cosmic_applications']?.update();
+        resetAppsButtons();
     }
 });
+
+function updateAppsButton() {
+    Main.panel.statusArea['cosmic_applications']?.update();
+}
+
+function resetAppsButtons() {
+    resetDockShowAppsButton();
+    updateAppsButton();
+}
 
 function resetDockShowAppsButton() {
     if (Main.overview.dash?.showAppsButton && Main.overview.dash.showAppsButton.checked) {
@@ -1318,8 +1333,13 @@ export function disable() {
     extensionInstance = null;
 }
 
+// Deliberately ignores dialog.visible: the actor stays visible throughout the
+// closing animation, which used to leave the top bar button stuck as checked.
 export function visible() {
-    return dialog && (dialog.state === ModalDialog.State?.OPENED || dialog.state === ModalDialog.State?.OPENING || dialog.visible);
+    return Boolean(
+        dialog &&
+        (dialog.state === ModalDialog.State?.OPENED || dialog.state === ModalDialog.State?.OPENING)
+    );
 }
 
 export function show() {
