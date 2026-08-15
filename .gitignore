@@ -1,8 +1,3 @@
-# AI Context & Local Planning (kept local, excluded from public repo)
-.scratch/
-AGENTS.md
-CONTEXT.md
-
 # Python
 .venv/
 __pycache__/
