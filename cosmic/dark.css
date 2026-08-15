@@ -1,0 +1,52 @@
+.cosmic-applications-dialog {
+	background-color: #2b2b2b;
+	color: #ffffff;
+	border-radius: 18px;
+	box-shadow: 0 4px 20px 4px rgba(0, 0, 0, 0.5);
+}
+
+.cosmic-applications-dialog StLabel {
+	color: #ffffff;
+}
+
+.cosmic-app-icon {
+	color: #ffffff;
+}
+
+.cosmic-app-icon StLabel {
+	color: #ffffff;
+	font-weight: 500;
+}
+
+.cosmic-base-folder-button {
+	color: #ffffff;
+}
+
+.cosmic-base-folder-button StLabel {
+	color: #ffffff;
+}
+
+.cosmic-applications-icon {
+	color: #d0d0d0;
+}
+
+.cosmic-applications-folder-title {
+	color: #ffffff;
+}
+
+.cosmic-applications-available {
+	color: #ffffff;
+}
+
+.cosmic-folder-edit-button {
+	background: #383838;
+	color: #ffffff;
+}
+
+.cosmic-folder-edit-button:hover {
+	background: #4a4a4a;
+}
+
+.cosmic-applications-separator {
+	background: rgba(255, 255, 255, 0.15);
+}

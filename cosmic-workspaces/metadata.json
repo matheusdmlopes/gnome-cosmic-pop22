@@ -1,0 +1,15 @@
+{
+    "name": "Cosmic Workspaces",
+    "description": "Bringing back vertically stacked workspaces",
+    "original-author": "rens.althuis@gmail.com",
+    "shell-version": [
+        "45",
+        "46",
+        "47",
+        "48"
+    ],
+    "url": "",
+    "uuid": "cosmic-workspaces@system76.com",
+    "settings-schema": "org.gnome.shell.extensions.cosmic-workspaces",
+    "version": "7"
+}

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Pop Settings
+Comment=Pop COSMIC Desktop Settings for GNOME 48
+Exec=uv --directory /home/matheusdm/Desktop/projetos/pop22/pop-settings run python -m pop_settings
+Icon=preferences-desktop
+Terminal=false
+Type=Application
+Categories=GNOME;GTK;Settings;DesktopSettings;
+Keywords=pop;cosmic;settings;workspaces;tiling;dock;
+StartupNotify=true

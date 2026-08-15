@@ -1,0 +1,15 @@
+{
+  "description": "Computer Operating System Main Interface Components",
+  "name": "Pop COSMIC",
+  "original-authors": "System76",
+  "shell-version": [
+    "45",
+    "46",
+    "47",
+    "48"
+  ],
+  "url": "https://github.com/pop-os/cosmic",
+  "uuid": "pop-cosmic@system76.com",
+  "settings-schema": "org.gnome.shell.extensions.pop-cosmic",
+  "version": 2
+}
