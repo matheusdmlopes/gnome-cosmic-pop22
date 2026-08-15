@@ -4,6 +4,10 @@
 
 Issues and specs live as local markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
 
+### Triage labels
+
+The five canonical roles, each label string equal to its name, recorded as the `Status:` line in the issue file. See `docs/agents/triage-labels.md`.
+
 ### Domain docs
 
 Single-context layout (`CONTEXT.md` and `docs/adr/` at repo root). See `docs/agents/domain.md`.
