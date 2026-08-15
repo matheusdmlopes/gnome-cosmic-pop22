@@ -12,6 +12,10 @@ APPLICATIONS_DIR := $(DESTDIR)$(PREFIX)/share/applications
 ICONS_DIR := $(DESTDIR)$(PREFIX)/share/icons
 THEMES_DIR := $(DESTDIR)$(PREFIX)/share/themes
 BACKGROUNDS_DIR := $(DESTDIR)$(PREFIX)/share/backgrounds
+SOUNDS_DIR := $(DESTDIR)$(PREFIX)/share/sounds
+# The Pop shell theme drops Pop-named files alongside GNOME's own theme, which
+# lives in gnome-shell-theme.gresource and is never touched.
+SHELL_THEME_DIR := $(DESTDIR)$(PREFIX)/share/gnome-shell/theme
 BIN_DIR := $(DESTDIR)$(PREFIX)/bin
 SETTINGS_LIB_DIR := $(DESTDIR)$(PREFIX)/share/pop-settings
 SETTINGS_LIB_RUNTIME := $(PREFIX)/share/pop-settings
@@ -204,9 +208,10 @@ uninstall:
 	@rm -rf $(LAUNCHER_LIB_DIR)
 	@rm -rf $(THEMES_DIR)/Pop $(THEMES_DIR)/Pop-dark
 	@rm -rf $(ICONS_DIR)/Pop $(ICONS_DIR)/Pop-Dark
+	@rm -rf $(SHELL_THEME_DIR)/Pop $(SHELL_THEME_DIR)/Pop-dark
+	@rm -f $(SHELL_THEME_DIR)/pop.css $(SHELL_THEME_DIR)/pop-dark.css
+	@rm -rf $(SOUNDS_DIR)/Pop
 	@echo "Uninstall completed."
-	@echo "note: the Pop GNOME Shell theme overwrote files in share/gnome-shell/theme;"
-	@echo "      reinstall your gnome-shell-common package to restore the stock theme."
 
 clean:
 	@rm -f cosmic/schemas/gschemas.compiled
