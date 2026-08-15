@@ -20,3 +20,10 @@ packages = ["src/pop_settings"]
 dev = [
     "pytest>=9.1.1",
 ]
+
+[tool.uv]
+# PyGObject, GTK4 and Libadwaita come from the distribution (python3-gi,
+# gir1.2-gtk-4.0, gir1.2-adw-1), never from PyPI. uv must therefore run the
+# project on the system interpreter rather than downloading its own, which
+# would not see the system site-packages where `gi` lives.
+python-preference = "only-system"

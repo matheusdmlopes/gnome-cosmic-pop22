@@ -36,7 +36,7 @@ LAUNCHER_SCRIPTS_DIR := $(LAUNCHER_LIB_DIR)/scripts
 LAUNCHER_BIN := $(BIN_DIR)/pop-launcher
 LAUNCHER_PLUGINS := calc desktop_entries files find pop_shell pulse recent scripts terminal web cosmic_toplevel
 
-.PHONY: all build build-shell build-launcher test test-syntax test-schemas test-desktop test-python \
+.PHONY: all build build-shell build-launcher test test-syntax test-schemas test-desktop test-python venv \
         install install-cosmic install-workspaces install-shell install-settings install-launcher \
         install-themes install-wallpapers install-all uninstall clean
 
@@ -93,12 +93,24 @@ test-desktop:
 	@echo "Validating desktop entries..."
 	@desktop-file-validate pop-settings/data/pop-settings.desktop
 
+# PyGObject is a distribution package, so the virtualenv has to be built from
+# the system interpreter with its site-packages visible. A venv that predates
+# this rule (or a restored CI cache) is rebuilt rather than silently reused,
+# since the alternative is an obscure "No module named 'gi'".
+venv:
+	@if [ ! -f pop-settings/.venv/pyvenv.cfg ] || \
+	    ! grep -q 'include-system-site-packages = true' pop-settings/.venv/pyvenv.cfg; then \
+		echo "Creating pop-settings virtualenv against the system Python..."; \
+		rm -rf pop-settings/.venv; \
+		cd pop-settings && uv venv --python python3 --system-site-packages; \
+	fi
+
 # Seam 2: Pop Settings application test suite.
 #
 # The tests build real GTK4/Libadwaita widgets, and GTK4 segfaults when it
 # constructs a widget with no display at all. In a graphical session that is
 # free; on a headless runner the suite goes through Xvfb.
-test-python:
+test-python: venv
 	@echo "Running pop-settings test suite..."
 	@if [ -n "$$DISPLAY" ] || [ -n "$$WAYLAND_DISPLAY" ]; then \
 		cd pop-settings && uv run pytest -q; \
