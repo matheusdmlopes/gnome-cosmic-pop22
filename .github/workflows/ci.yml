@@ -33,6 +33,7 @@ jobs:
             pkg-config \
             python3-gi \
             python3-gi-cairo \
+            qalc \
             sassc \
             xvfb
 
