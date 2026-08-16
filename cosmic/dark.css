@@ -50,3 +50,24 @@
 .cosmic-applications-separator {
 	background: rgba(255, 255, 255, 0.15);
 }
+
+.cosmic-app-scroll-view StScrollBar {
+	min-width: 10px;
+	padding: 0;
+}
+
+.cosmic-app-scroll-view StScrollBar StBin#trough {
+	background-color: transparent;
+	border-radius: 5px;
+}
+
+.cosmic-app-scroll-view StScrollBar StButton#vhandle {
+	background-color: rgba(255, 255, 255, 0.35);
+	border-radius: 5px;
+	min-width: 8px;
+}
+
+.cosmic-app-scroll-view StScrollBar StButton#vhandle:hover {
+	background-color: rgba(255, 255, 255, 0.6);
+}
+

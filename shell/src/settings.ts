@@ -3,7 +3,7 @@ import Gio from 'gi://Gio';
 import Gdk from 'gi://Gdk';
 import { get_current_path } from './paths.js';
 
-const DARK = ['dark', 'adapta', 'plata', 'dracula'];
+const DARK_THEMES = ['dark', 'adapta', 'plata', 'dracula', 'pop', 'yaru', 'adwaita-dark'];
 
 interface Settings extends GObject.Object {
     get_boolean(key: string): boolean;
@@ -122,12 +122,33 @@ export class ExtensionSettings {
     }
 
     theme(): string {
-        return this.shell ? this.shell.get_string('name') : this.int ? this.int.get_string('gtk-theme') : 'Adwaita';
+        let name = '';
+        if (this.shell) {
+            try {
+                name = this.shell.get_string('name');
+            } catch {}
+        }
+        if (name && name.length > 0) {
+            return name;
+        }
+        if (this.int) {
+            try {
+                return this.int.get_string('gtk-theme');
+            } catch {}
+        }
+        return 'Pop';
     }
 
     is_dark(): boolean {
+        if (this.int) {
+            try {
+                const colorScheme = this.int.get_string('color-scheme');
+                if (colorScheme === 'prefer-dark') return true;
+                if (colorScheme === 'prefer-light') return false;
+            } catch {}
+        }
         const theme = this.theme().toLowerCase();
-        return DARK.some((dark) => theme.includes(dark));
+        return DARK_THEMES.some((dark) => theme.includes(dark));
     }
 
     is_high_contrast(): boolean {

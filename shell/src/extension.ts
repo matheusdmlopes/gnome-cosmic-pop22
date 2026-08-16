@@ -256,6 +256,9 @@ export class Ext extends Ecs.System<ExtEvent> {
             this.settings.int.connect('changed::gtk-theme', () => {
                 this.register(Events.global(GlobalEvent.GtkThemeChanged));
             });
+            this.settings.int.connect('changed::color-scheme', () => {
+                this.register(Events.global(GlobalEvent.GtkThemeChanged));
+            });
         }
 
         if (this.settings.shell) {

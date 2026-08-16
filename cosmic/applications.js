@@ -22,6 +22,8 @@ import * as Search from 'resource:///org/gnome/shell/ui/search.js';
 import * as Util from 'resource:///org/gnome/shell/misc/util.js';
 import { gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 
+import { gridMetrics } from './gridMetrics.js';
+
 let dialog = null;
 let extensionInstance = null;
 
@@ -326,6 +328,20 @@ class CosmicAppIcon extends AppDisplay.AppIcon {
 
         this.add_style_class_name('cosmic-app-icon');
     }
+
+    activate(button) {
+        super.activate(button);
+        hide();
+    }
+
+    popupMenu(side = St.Side.BOTTOM) {
+        const menu = super.popupMenu(side);
+        if (this._menu && !this._menu._cosmic_hide_connected) {
+            this._menu._cosmic_hide_connected = true;
+            this._menu.connect('activate', () => hide());
+        }
+        return menu;
+    }
 });
 
 export const CosmicAppsHeader = GObject.registerClass({
@@ -539,6 +555,82 @@ class CosmicModalDialog extends ModalDialog.ModalDialog {
     }
 });
 
+// St.Viewport hands StScrollView MAX(visible height, layout minimum height) as
+// the vertical adjustment's upper bound, so the scrollable extent comes from the
+// layout manager's *minimum*, never its natural size. Clutter.FlowLayout reports
+// a single row as its minimum -- it can always collapse to one row by growing
+// sideways -- which pinned upper onto page_size and left the grid unscrollable
+// while it painted seven rows. FlowLayout is a final type in Clutter 16 and
+// cannot be subclassed to correct that, hence this replacement: same homogeneous
+// wrapping geometry, but the wrapped height is reported as the minimum too.
+export const CosmicAppGridLayout = GObject.registerClass(
+class CosmicAppGridLayout extends Clutter.LayoutManager {
+    _visibleChildren(container) {
+        return container.get_children().filter(child => child.visible);
+    }
+
+    _itemSize(children) {
+        let width = 0;
+        let height = 0;
+        for (const child of children) {
+            const [, naturalWidth] = child.get_preferred_width(-1);
+            const [, naturalHeight] = child.get_preferred_height(-1);
+            width = Math.max(width, naturalWidth);
+            height = Math.max(height, naturalHeight);
+        }
+        return [width, height];
+    }
+
+    _metrics(container, availableWidth) {
+        const children = this._visibleChildren(container);
+        const [itemWidth, itemHeight] = this._itemSize(children);
+
+        return [children, gridMetrics({
+            availableWidth,
+            itemWidth,
+            itemHeight,
+            count: children.length,
+        })];
+    }
+
+    vfunc_get_preferred_width(container, _forHeight) {
+        const children = this._visibleChildren(container);
+        const [itemWidth] = this._itemSize(children);
+
+        return [itemWidth, itemWidth * children.length];
+    }
+
+    vfunc_get_preferred_height(container, forWidth) {
+        const [, metrics] = this._metrics(container, forWidth);
+
+        // Minimum and natural are equal on purpose: the minimum is the only one
+        // that reaches the scroll adjustment.
+        return [metrics.contentHeight, metrics.contentHeight];
+    }
+
+    vfunc_allocate(container, box) {
+        const availableWidth = box.get_width();
+        const [children, metrics] = this._metrics(container, availableWidth);
+
+        if (metrics.columns === 0)
+            return;
+
+        const rtl = container.get_text_direction() === Clutter.TextDirection.RTL;
+
+        children.forEach((child, index) => {
+            const column = index % metrics.columns;
+            const row = Math.floor(index / metrics.columns);
+            const x = rtl
+                ? availableWidth - (column + 1) * metrics.cellWidth
+                : column * metrics.cellWidth;
+
+            const childBox = new Clutter.ActorBox();
+            childBox.init_rect(x, row * metrics.cellHeight, metrics.cellWidth, metrics.cellHeight);
+            child.allocate(childBox);
+        });
+    }
+});
+
 export const CosmicAppDisplay = GObject.registerClass({
     Properties: {
         'folder': GObject.ParamSpec.object(
@@ -553,15 +645,21 @@ export const CosmicAppDisplay = GObject.registerClass({
                 orientation: Clutter.Orientation.VERTICAL,
                 spacing: 6
             }),
+            reactive: true,
         });
         this.add_style_class_name('cosmic-app-display');
-
+        this.reactive = true;
         this._scrollView = new St.ScrollView({
             hscrollbar_policy: St.PolicyType.NEVER,
+            vscrollbar_policy: St.PolicyType.AUTOMATIC,
             x_expand: true,
-            overlay_scrollbars: true
+            y_expand: true,
+            reactive: true,
+            overlay_scrollbars: false,
+            enable_mouse_scrolling: true,
         });
         this._scrollView.add_style_class_name('cosmic-app-scroll-view');
+        this._scrollView.add_style_class_name('vfade');
         this.add_child(this._scrollView);
 
         this._parentalControlsManager = ParentalControlsManager.getDefault();
@@ -570,12 +668,10 @@ export const CosmicAppDisplay = GObject.registerClass({
         });
 
         this._box = new St.Viewport({
-            layout_manager: new Clutter.FlowLayout({
-                orientation: Clutter.Orientation.HORIZONTAL,
-                homogeneous: true,
-            }),
+            layout_manager: new CosmicAppGridLayout(),
             x_expand: true,
-            y_expand: true
+            y_expand: true,
+            reactive: true,
         });
         this._scrollView.set_child(this._box);
 
@@ -680,6 +776,11 @@ export const CosmicAppDisplay = GObject.registerClass({
             app.visible = this._parentalControlsManager.shouldShowApp(appInfo) &&
                           ids.includes(app.getId());
         });
+
+        // Now that the grid scrolls, a folder switch would otherwise inherit the
+        // previous folder's scroll offset and open part-way down.
+        if (this._scrollView.vadjustment)
+            this._scrollView.vadjustment.value = 0;
     }
 
     _getAddedRemovedApps() {
@@ -980,6 +1081,14 @@ export const CosmicSearchResultsView = GObject.registerClass({
                     this._available_spinner.stop();
 
                 this._maybeSetInitialSelection();
+
+                const container = display._grid || display._resultDisplayBin || display;
+                container?.get_children?.().forEach(resultActor => {
+                    if (resultActor && !resultActor._cosmic_hide_connected) {
+                        resultActor._cosmic_hide_connected = true;
+                        resultActor.connect?.('clicked', () => hide());
+                    }
+                });
             });
         }
     }
@@ -1008,8 +1117,10 @@ export const CosmicSearchResultsView = GObject.registerClass({
     }
 
     activateDefault() {
-        if (this._defaultResult)
+        if (this._defaultResult) {
             this._defaultResult.activate();
+            hide();
+        }
     }
 
     navigateFocus(direction) {
@@ -1081,7 +1192,10 @@ class CosmicAppsDialog extends CosmicModalDialog {
         // for instance when the Shell drops the modal grab, so settle the
         // buttons from the dialog's own state signals.
         this.connect('opened', () => updateAppsButton());
-        this.connect('closed', () => resetAppsButtons());
+        this.connect('closed', () => {
+            this._unwatchOutsideClicks();
+            resetAppsButtons();
+        });
 
         this.connect("key-press-event", (_, event) => {
             if (event.get_key_symbol() === Clutter.KEY_Escape)
@@ -1092,29 +1206,7 @@ class CosmicAppsDialog extends CosmicModalDialog {
                 this.appDisplay.select_previous_folder();
         });
 
-        this.button_press_id = global.stage.connect('button-press-event', () => {
-            function has_excluded_ancestor(actor) {
-                if (actor === null)
-                    return false;
-                else if (actor === this.dialogLayout._dialog ||
-                         actor._delegate instanceof PopupMenu ||
-                         (actor instanceof AppDisplay.AppIcon &&
-                          actor.app?.id === "pop-cosmic-applications.desktop") ||
-                         actor === Main.panel.statusArea['cosmic_applications'] ||
-                         actor === Main.overview.dash?.showAppsButton ||
-                         actor.has_style_class_name?.('show-apps') ||
-                         actor._delegate?.has_style_class_name?.('show-apps'))
-                    return true;
-                else
-                    return has_excluded_ancestor.call(this, actor.get_parent());
-            }
-
-            const [ x, y ] = global.get_pointer();
-            const focused_actor = global.stage.get_actor_at_pos(Clutter.PickMode.ALL, x, y);
-
-            if (this.visible && !has_excluded_ancestor.call(this, focused_actor))
-                this.hideDialog();
-        });
+        this._stageCaptureId = 0;
 
         this._interfaceSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' });
         this._interfaceSettings.connect('changed::gtk-theme', this.reload_theme.bind(this));
@@ -1126,6 +1218,56 @@ class CosmicAppsDialog extends CosmicModalDialog {
             this._userThemeSettings.connect('changed::name', this.reload_theme.bind(this));
         } catch {}
         this.reload_theme();
+    }
+
+    // While the modal grab is held, a press over the desktop or a window is
+    // never delivered into the actor tree, so the bubbling 'button-press-event'
+    // on the stage did not fire and the first click outside was lost. Only once
+    // that click had dropped the grab did the second one bubble through and
+    // dismiss the dialog. The capture phase runs before delivery and sees every
+    // press, grab or no grab, so it fires on the first click.
+    _watchOutsideClicks() {
+        if (this._stageCaptureId)
+            return;
+
+        this._stageCaptureId = global.stage.connect('captured-event', (_actor, event) => {
+            if (event.type() === Clutter.EventType.BUTTON_PRESS)
+                this._dismissIfOutside(event);
+
+            return Clutter.EVENT_PROPAGATE;
+        });
+    }
+
+    _unwatchOutsideClicks() {
+        if (!this._stageCaptureId)
+            return;
+
+        global.stage.disconnect(this._stageCaptureId);
+        this._stageCaptureId = 0;
+    }
+
+    _dismissIfOutside(event) {
+        const has_excluded_ancestor = (actor) => {
+            if (actor === null)
+                return false;
+            else if (actor === this.dialogLayout._dialog ||
+                     actor._delegate instanceof PopupMenu ||
+                     (actor instanceof AppDisplay.AppIcon &&
+                      actor.app?.id === "pop-cosmic-applications.desktop") ||
+                     actor === Main.panel.statusArea['cosmic_applications'] ||
+                     actor === Main.overview.dash?.showAppsButton ||
+                     actor.has_style_class_name?.('show-apps') ||
+                     actor._delegate?.has_style_class_name?.('show-apps'))
+                return true;
+            else
+                return has_excluded_ancestor(actor.get_parent());
+        };
+
+        const [ x, y ] = event.get_coords();
+        const pressed_actor = global.stage.get_actor_at_pos(Clutter.PickMode.ALL, x, y);
+
+        if (this.visible && !has_excluded_ancestor(pressed_actor))
+            this.hideDialog();
     }
 
     _onSearchKeyPress(entry, event) {
@@ -1213,7 +1355,7 @@ class CosmicAppsDialog extends CosmicModalDialog {
     }
 
     _onDestroy() {
-        global.stage.disconnect(this.button_press_id);
+        this._unwatchOutsideClicks();
 
         if (extensionInstance) {
             let darkStylesheet = extensionInstance.dir.get_child("dark.css");
@@ -1256,15 +1398,15 @@ class CosmicAppsDialog extends CosmicModalDialog {
 
     showDialog() {
         this.open();
+        this._watchOutsideClicks();
         this._header.reset();
 
         const monitor = this.monitor();
         const monitorScale = 1 / St.ThemeContext.get_for_stage(global.stage).scale_factor;
 
-        const height = Math.min(
-            168 * 3,
-            Math.floor(monitorScale * monitor.height * 0.65 / 168) * 168
-        );
+        const rowHeight = 180;
+        const availableHeight = Math.floor(monitorScale * monitor.height * 0.65);
+        const height = Math.min(rowHeight * 3 + 24, Math.max(rowHeight, Math.floor(availableHeight / rowHeight) * rowHeight + 24));
         const width = Math.min(
             168 * 7,
             Math.floor(monitorScale * monitor.width * 0.90 / 168) * 168

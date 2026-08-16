@@ -72,7 +72,7 @@ build-launcher:
 # Test - the three validation seams
 # ---------------------------------------------------------------------------
 
-test: test-schemas test-syntax test-launcher test-desktop test-python test-rust test-format test-clippy test-release-contract test-doctor
+test: test-schemas test-syntax test-launcher test-grid test-desktop test-python test-rust test-format test-clippy test-release-contract test-doctor
 
 # Seam 1a: strict GSettings schema compilation.
 test-schemas:
@@ -92,6 +92,12 @@ test-syntax: build-shell
 test-launcher: build-shell
 	@echo "Running LauncherService test suite with gjs..."
 	@gjs -m scripts/test-launcher-service.js
+
+# Seam 1d: applications grid arithmetic, the input St.Viewport turns into the
+# drawer's scrollable extent.
+test-grid:
+	@echo "Running applications grid metrics test suite with gjs..."
+	@gjs -m scripts/test-grid-metrics.js
 
 # Seam 3: desktop entry validation.
 test-desktop:
