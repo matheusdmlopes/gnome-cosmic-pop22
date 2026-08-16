@@ -28,7 +28,9 @@ jobs:
             gir1.2-gtk-4.0 \
             libgirepository1.0-dev \
             libglib2.0-dev \
+            libxkbcommon-dev \
             meson \
+            pkg-config \
             python3-gi \
             python3-gi-cairo \
             sassc \
@@ -158,8 +160,13 @@ jobs:
           apt-get purge -y gnome-cosmic-pop22
           test ! -e /usr/share/gnome-shell/extensions/pop-cosmic@system76.com
 
+      - name: Collect Debian package
+        run: |
+          mkdir -p dist
+          cp ../gnome-cosmic-pop22_*_amd64.deb dist/
+
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
         with:
           name: gnome-cosmic-pop22-debian13-amd64
-          path: ../gnome-cosmic-pop22_*_amd64.deb
+          path: dist/gnome-cosmic-pop22_*_amd64.deb

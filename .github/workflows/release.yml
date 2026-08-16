@@ -56,14 +56,15 @@ jobs:
       - name: Build release assets
         run: |
           dpkg-buildpackage --no-sign --build=binary
-          package="$(find .. -maxdepth 1 -name 'gnome-cosmic-pop22_*_amd64.deb' -print -quit)"
+          mkdir -p dist
+          cp ../gnome-cosmic-pop22_*_amd64.deb dist/
+          package="$(find dist -maxdepth 1 -name 'gnome-cosmic-pop22_*_amd64.deb' -print -quit)"
           test -n "$package"
-          package_dir="$(dirname "$package")"
           package_name="$(basename "$package")"
-          (cd "$package_dir" && sha256sum "$package_name" > "${package_name}.sha256")
+          (cd dist && sha256sum "$package_name" > "${package_name}.sha256")
           cargo metadata --manifest-path launcher/Cargo.toml --locked --format-version 1 \
             | jq '{dependencies: [.packages[] | {name, version, license, source}] | sort_by(.name, .version)}' \
-            > rust-dependencies.json
+            > dist/rust-dependencies.json
 
       - name: Publish GitHub prerelease
         uses: softprops/action-gh-release@v2
@@ -73,6 +74,6 @@ jobs:
           prerelease: true
           generate_release_notes: true
           files: |
-            ../gnome-cosmic-pop22_*_amd64.deb
-            ../gnome-cosmic-pop22_*_amd64.deb.sha256
-            rust-dependencies.json
+            dist/gnome-cosmic-pop22_*_amd64.deb
+            dist/gnome-cosmic-pop22_*_amd64.deb.sha256
+            dist/rust-dependencies.json
