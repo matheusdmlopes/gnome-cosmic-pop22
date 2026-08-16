@@ -1,6 +1,6 @@
 # Spec: Public Beta 0.1.0-beta.1
 
-Status: ready-for-human
+Status: completed
 
 ## Goal
 
